@@ -8,7 +8,7 @@
   const hasDraw = Boolean(window.DrawSVGPlugin);
   const hasPhysics = Boolean(window.Physics2DPlugin);
   if (window.CustomWiggle) window.CustomWiggle.create('errShake', { wiggles: 3, type: 'easeOut' });
-  const VERSION = '1.0.2';
+  const VERSION = '1.1.0';
   const NS = 'http://www.w3.org/2000/svg';
 
   const LINES = window.MIMI_LINES;
@@ -60,7 +60,7 @@
     const fresh = () => ({
       v: 1, onboarded: false, lastVisit: null,
       profile: { name: '', now: '', goal: 750, daily: 20 },
-      settings: { timer: 20, sound: true, voice: true, speak: true, motion: 'auto' },
+      settings: { timer: 20, sound: true, voice: true, speak: true, speakAfter: true, motion: 'auto' },
       xp: 0, streak: { last: null, count: 0, best: 0 },
       days: {}, words: {}, gram: {}, history: [], seenLesson: {},
     });
@@ -1081,6 +1081,19 @@
     }
     renderExplain(q, { ok, timedOut, elapsed, gain, rightText: q.choices[rightIndex].text });
     showFoot(round.i === round.items.length - 1 ? '結果を見る' : 'つぎへ');
+    readAfterAnswer(q, q.choices[rightIndex].text);
+  }
+
+  // 答えたあと、例文を読み上げる（設定でオフにできる）。
+  // 文法は空欄に正解を入れた文、単語はその単語の例文。効果音とミミの反応のあとに始める
+  function readAfterAnswer(q, rightText) {
+    if (!store.data.settings.speakAfter || !speech.supported) return;
+    const text = q.kind === 'grammar' ? q.g.q.replace('-------', rightText) : q.word.ex;
+    gsap.delayedCall(.75, () => {
+      if (!round || round.q !== q || current !== 'quiz') return; // もう次の問題へ進んだ
+      const buttons = quizEls.explain.querySelectorAll('.say-btn');
+      speakWith(buttons[buttons.length - 1], text, .9);
+    });
   }
 
   function renderExplain(q, { ok, timedOut, elapsed, gain, rightText }) {
