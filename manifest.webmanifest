@@ -1,0 +1,18 @@
+{
+  "id": "./",
+  "name": "ミミとTOEIC",
+  "short_name": "ミミとTOEIC",
+  "description": "キャラクターのミミといっしょに、TOEIC 600点から750点を目指す単語と文法（Part 5）の練習アプリです。",
+  "lang": "ja",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f6f1e7",
+  "theme_color": "#f6f1e7",
+  "categories": ["education"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
