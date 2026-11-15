@@ -8,7 +8,7 @@
   const hasDraw = Boolean(window.DrawSVGPlugin);
   const hasPhysics = Boolean(window.Physics2DPlugin);
   if (window.CustomWiggle) window.CustomWiggle.create('errShake', { wiggles: 3, type: 'easeOut' });
-  const VERSION = '1.0.1';
+  const VERSION = '1.0.2';
   const NS = 'http://www.w3.org/2000/svg';
 
   const LINES = window.MIMI_LINES;
@@ -1723,7 +1723,7 @@
       const key = dayKey(date);
       const cell = make('span', null, String(day));
       if (studied(key)) { cell.classList.add('done'); count++; }
-      if (key === todayKey) cell.classList.add('today');
+      if (key === todayKey) cell.classList.add('cal-today');
       if (date > now) cell.classList.add('future');
       cell.setAttribute('aria-label', `${m + 1}月${day}日${cell.classList.contains('done') ? '、勉強した日' : ''}`);
       cal.append(cell);
