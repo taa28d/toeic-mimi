@@ -8,7 +8,7 @@
   const hasDraw = Boolean(window.DrawSVGPlugin);
   const hasPhysics = Boolean(window.Physics2DPlugin);
   if (window.CustomWiggle) window.CustomWiggle.create('errShake', { wiggles: 3, type: 'easeOut' });
-  const VERSION = '1.0.0';
+  const VERSION = '1.0.1';
   const NS = 'http://www.w3.org/2000/svg';
 
   const LINES = window.MIMI_LINES;
@@ -53,7 +53,6 @@
   const pad = n => String(n).padStart(2, '0');
   const dayKey = (d = new Date()) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   const dayNo = (d = new Date()) => Math.round(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 864e5);
-  const dateOfNo = n => { const d = new Date(n * 864e5); return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()); };
 
   /* ━━ 2. 保存（localStorage：この端末の中だけ） ━━ */
   const STORE_KEY = 'toeic-mimi';
@@ -679,7 +678,10 @@
     const today = todayStat();
     $('home-date').textContent = `${now.getMonth() + 1}月${now.getDate()}日（${'日月火水木金土'[now.getDay()]}）`;
     const hello = { morning: 'おはよう', day: 'こんにちは', evening: 'こんばんは', night: 'こんばんは' }[timeSlot()];
-    $('home-hello').textContent = d.profile.name ? `${hello}、${d.profile.name}さん` : hello;
+    // 名前があれば「おはよう、」のあとで改行して名前を出す
+    const helloEl = $('home-hello');
+    if (d.profile.name) helloEl.replaceChildren(`${hello}、`, make('span', 'hello-name', `${d.profile.name}さん`));
+    else helloEl.textContent = hello;
     const lv = levelInfo(d.xp);
     $('home-lv-n').textContent = `Lv.${lv.level}`;
     setBar($('home-lvbar'), lv.progress);
@@ -1657,24 +1659,9 @@
       return box;
     }));
 
-    // 6週間ぶんの勉強した日（月曜はじまり）
-    const cal = $('records-cal');
-    cal.replaceChildren();
-    const t = dayNo();
-    const weekday = (new Date().getDay() + 6) % 7;
-    const goal = d.profile.daily;
-    for (let n = t - 35 - weekday; n < t - weekday + 7; n++) {
-      const cell = make('i');
-      if (n <= t) {
-        const stat = d.days[dayKey(dateOfNo(n))];
-        const q = stat ? (stat.q || 0) + (stat.c || 0) : 0;
-        if (q > 0) cell.className = q >= goal ? 'l3' : q >= goal / 2 ? 'l2' : 'l1';
-        if (n === t) cell.classList.add('today');
-        cell.title = `${dateOfNo(n).getMonth() + 1}/${dateOfNo(n).getDate()}：${q}`;
-      } else cell.style.visibility = 'hidden';
-      cal.append(cell);
-    }
-    if (!calm()) gsap.from(cal.children, { scale: 0, duration: .35, ease: 'back.out(2)', stagger: { each: .008, from: 'end' }, clearProps: 'transform' });
+    const now = new Date();
+    calMonth = { y: now.getFullYear(), m: now.getMonth() };
+    renderCalendar();
 
     const cats = $('records-cats');
     cats.replaceChildren();
@@ -1712,6 +1699,54 @@
     $('about-version').textContent = `バージョン ${VERSION} ・ 単語 ${WORDS.length}語 ・ 文法 ${GRAMMAR.length}問`;
     renderInstall();
   }
+  // ふつうの月のカレンダー（月曜はじまり）。問題を解くかカードをめくった日に色をつける
+  let calMonth = null;
+  const studied = key => {
+    const stat = store.data.days[key];
+    return Boolean(stat && ((stat.q || 0) + (stat.c || 0) > 0));
+  };
+  function renderCalendar(dir = 0) {
+    const { y, m } = calMonth;
+    const now = new Date();
+    const todayKey = dayKey(now);
+    const isThisMonth = y === now.getFullYear() && m === now.getMonth();
+    $('cal-title').textContent = `${y}年${m + 1}月`;
+    $('cal-next').disabled = isThisMonth;
+    const cal = $('records-cal');
+    cal.replaceChildren();
+    const blanks = (new Date(y, m, 1).getDay() + 6) % 7;
+    for (let i = 0; i < blanks; i++) cal.append(make('i'));
+    const days = new Date(y, m + 1, 0).getDate();
+    let count = 0;
+    for (let day = 1; day <= days; day++) {
+      const date = new Date(y, m, day);
+      const key = dayKey(date);
+      const cell = make('span', null, String(day));
+      if (studied(key)) { cell.classList.add('done'); count++; }
+      if (key === todayKey) cell.classList.add('today');
+      if (date > now) cell.classList.add('future');
+      cell.setAttribute('aria-label', `${m + 1}月${day}日${cell.classList.contains('done') ? '、勉強した日' : ''}`);
+      cal.append(cell);
+    }
+    const note = $('cal-note');
+    note.replaceChildren();
+    if (count) note.append(`${isThisMonth ? '今月' : `${m + 1}月`}は `, make('b', null, String(count)), ' 日勉強しました');
+    else note.textContent = isThisMonth ? '今月はまだ勉強した日がありません。今日から始めよう！' : `${m + 1}月に勉強した日はありません`;
+    if (calm()) return;
+    if (dir) gsap.fromTo(cal, { x: 24 * dir, opacity: 0 }, { x: 0, opacity: 1, duration: .32, ease: 'power3.out', clearProps: 'transform,opacity' });
+    const done = cal.querySelectorAll('.done');
+    if (done.length) gsap.from(done, { scale: 0, duration: .45, ease: 'back.out(2.5)', stagger: .03, delay: dir ? .1 : .3, clearProps: 'transform' });
+  }
+  $('cal-prev').addEventListener('click', () => {
+    calMonth = calMonth.m === 0 ? { y: calMonth.y - 1, m: 11 } : { y: calMonth.y, m: calMonth.m - 1 };
+    renderCalendar(-1);
+  });
+  $('cal-next').addEventListener('click', () => {
+    if ($('cal-next').disabled) return;
+    calMonth = calMonth.m === 11 ? { y: calMonth.y + 1, m: 0 } : { y: calMonth.y, m: calMonth.m + 1 };
+    renderCalendar(1);
+  });
+
   $('set-name').addEventListener('input', e => { store.data.profile.name = e.target.value.trim().slice(0, 12); store.save(); });
   document.querySelectorAll('.seg').forEach(seg => seg.addEventListener('click', e => {
     const btn = e.target.closest('button');
