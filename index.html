@@ -3,8 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- 読み込めるのはこのサイトのファイルだけ。外のスクリプトや通信を使わないので、万一の差し込みを防ぐ -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self'; connect-src 'self'; font-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
 <title>ミミとTOEIC</title>
 <meta name="description" content="キャラクターのミミといっしょに、TOEIC 600点から750点を目指す単語と文法（Part 5）の練習アプリです。オフラインでも使えます。">
+<meta property="og:type" content="website">
+<meta property="og:title" content="ミミとTOEIC">
+<meta property="og:description" content="キャラクターのミミといっしょに、TOEIC 600→750点を目指す単語と文法（Part 5）の練習アプリ。">
+<meta property="og:url" content="https://taa28d.github.io/toeic-mimi/">
+<meta property="og:image" content="https://taa28d.github.io/toeic-mimi/icons/og-image.png">
+<meta property="og:locale" content="ja_JP">
+<meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#f6f1e7">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -34,7 +43,7 @@
   --line: #ddd2bf;
   --text: #1f2233;
   --muted: #5b5e70;
-  --faint: #85879a;
+  --faint: #6a6c7e;   /* 生成りの地で文字の読みやすさ 4.5:1 以上 */
   --accent: #3a4bd6;
   --accent-2: #5b6cf2;
   --on-accent: #ffffff;
@@ -52,6 +61,7 @@
   --bad-text: #a72f1d;
   --on-bad: #ffffff;
   --warn: #ea8419;
+  --warn-text: #a85500; /* 残り時間の数字。地との差を 4.5:1 以上に */
   --pink: #f2638b;
   --tie: #3a4bd6;
   --shadow: 0 1px 0 rgba(47, 39, 71, .05), 0 12px 30px -18px rgba(47, 39, 71, .35);
@@ -77,7 +87,7 @@
     --sun: #ffc44d; --sun-soft: #3e3219; --sun-text: #ffd67c;
     --good: #47d3a0; --good-soft: #163c31; --good-text: #82e7c2; --on-good: #062418;
     --bad: #ff8a77; --bad-soft: #44231f; --bad-text: #ffb4a8; --on-bad: #2f0b06;
-    --warn: #ffab4a; --pink: #ff86a8; --tie: #5b6cf2;
+    --warn: #ffab4a; --warn-text: #ffb760; --pink: #ff86a8; --tie: #5b6cf2;
     --shadow: 0 1px 0 rgba(0, 0, 0, .25), 0 16px 34px -20px rgba(0, 0, 0, .8);
     --blob-1: #4a3a6a; --blob-2: #22356f; --blob-3: #5b2e50;
     color-scheme: dark;
@@ -90,7 +100,7 @@
   --sun: #ffc44d; --sun-soft: #3e3219; --sun-text: #ffd67c;
   --good: #47d3a0; --good-soft: #163c31; --good-text: #82e7c2; --on-good: #062418;
   --bad: #ff8a77; --bad-soft: #44231f; --bad-text: #ffb4a8; --on-bad: #2f0b06;
-  --warn: #ffab4a; --pink: #ff86a8; --tie: #5b6cf2;
+  --warn: #ffab4a; --warn-text: #ffb760; --pink: #ff86a8; --tie: #5b6cf2;
   --shadow: 0 1px 0 rgba(0, 0, 0, .25), 0 16px 34px -20px rgba(0, 0, 0, .8);
   --blob-1: #4a3a6a; --blob-2: #22356f; --blob-3: #5b2e50;
   color-scheme: dark;
@@ -98,7 +108,7 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 [hidden] { display: none !important; }
-html { background: var(--bg); -webkit-text-size-adjust: 100%; }
+html { background: var(--bg); -webkit-text-size-adjust: 100%; overscroll-behavior-y: none; } /* 引っぱって再読み込みを起こさない（問題の途中で消えないように） */
 body {
   margin: 0;
   min-height: 100vh;
@@ -114,7 +124,9 @@ h1, h2, h3, p, ul, ol, dl, dd, figure { margin: 0; padding: 0; }
 ul, ol { list-style: none; }
 body { word-break: auto-phrase; }
 [lang="en"] { font-family: var(--en); }
-button { appearance: none; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; touch-action: manipulation; padding: 0; }
+button { appearance: none; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; touch-action: manipulation; padding: 0; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+h1, h2, .hello, .result-title { font-feature-settings: "palt"; } /* 見出しのかなを詰めて読みやすく */
+.screen:focus { outline: none; }
 button:disabled { cursor: default; }
 input, textarea { font: inherit; color: inherit; }
 :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: 10px; }
@@ -352,7 +364,7 @@ html.bars-themed .tabs { background: var(--bg); -webkit-backdrop-filter: none; b
 .timer b { position: absolute; inset: 0; display: grid; place-items: center; font: 800 1.3rem/1 var(--en); font-variant-numeric: tabular-nums; }
 .timer.warn .timer-bar { stroke: var(--warn); }
 .timer.danger .timer-bar { stroke: var(--bad); }
-.timer.warn b { color: var(--warn); }
+.timer.warn b { color: var(--warn-text); }
 .timer.danger b { color: var(--bad-text); }
 
 .qcard { position: relative; padding: 18px 18px 20px; border-radius: 22px; background: var(--surface); box-shadow: var(--shadow); }
@@ -509,7 +521,7 @@ html.bars-themed .tabs { background: var(--bg); -webkit-backdrop-filter: none; b
 .cal span.future { opacity: .35; }
 .cal-note { margin-top: 12px; color: var(--muted); font-size: .88rem; font-weight: 700; }
 .cal-note b { color: var(--good-text); font-family: var(--en); font-size: 1.05rem; }
-.catbar { display: grid; grid-template-columns: 7.5em minmax(0, 1fr) 3.2em; gap: 10px; align-items: center; font-size: .86rem; font-weight: 700; }
+.catbar { display: grid; grid-template-columns: 8.6em minmax(0, 1fr) 3.2em; gap: 10px; align-items: center; font-size: .86rem; font-weight: 700; }
 .catbar + .catbar { margin-top: 8px; }
 .catbar b { font: 700 .8rem var(--en); color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
 .hist li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); font-size: .9rem; }
@@ -537,6 +549,26 @@ textarea.field { min-height: 90px; padding: 12px 14px; font: .8rem/1.4 ui-monosp
 .about { color: var(--muted); font-size: .8rem; line-height: 1.7; }
 .about p + p { margin-top: 6px; }
 .note { color: var(--muted); font-size: .85rem; margin-top: 8px; }
+.about a { color: var(--accent-text); font-weight: 700; }
+/* 使い方（開くと読める） */
+.faq details { border-top: 1px solid var(--line); padding: 10px 0; }
+.faq details:first-of-type { border-top: 0; padding-top: 2px; }
+.faq summary { cursor: pointer; font-weight: 800; list-style: none; display: flex; justify-content: space-between; gap: 12px; }
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after { content: "＋"; color: var(--faint); font-weight: 700; }
+.faq details[open] summary::after { content: "－"; }
+.faq details p { margin-top: 6px; font-size: .92rem; color: var(--muted); line-height: 1.75; }
+/* 新しい版が届いたときのお知らせ */
+.toast {
+  position: fixed; left: 0; right: 0; bottom: calc(var(--sa-bottom) + 84px); z-index: 45;
+  display: flex; align-items: center; gap: 10px; width: min(calc(100% - 32px), 440px); margin: 0 auto;
+  padding: 10px 10px 10px 16px; border-radius: 18px; background: var(--text); color: var(--bg);
+  box-shadow: 0 18px 40px -16px rgba(0, 0, 0, .55); font-weight: 700; font-size: .92rem;
+}
+.toast p { flex: 1; line-height: 1.5; }
+.toast .btn { min-height: 40px; padding: 0 16px; font-size: .88rem; box-shadow: none; }
+.toast .toast-x { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; color: inherit; opacity: .7; }
+.toast .toast-x .icon { width: 1.1rem; height: 1.1rem; }
 
 /* ── 紙吹雪・XPの数字（いちばん手前の層） ── */
 .fx { position: fixed; inset: 0; z-index: 30; pointer-events: none; overflow: hidden; }
@@ -624,7 +656,7 @@ html.calm *, html.calm *::before, html.calm *::after { transition-duration: .01s
   <section class="screen welcome" id="s-welcome" hidden>
     <div class="welcome-stage">
       <div class="mimi-spot" role="button" tabindex="0" aria-label="ミミ"></div>
-      <div class="bubble" data-tail="top" aria-live="polite"><p class="bubble-text"></p></div>
+      <div class="bubble" data-tail="top" aria-hidden="true"><p class="bubble-text"></p></div>
     </div>
     <div class="welcome-step" id="welcome-step"></div>
     <div class="dots" id="welcome-dots" aria-hidden="true"></div>
@@ -646,7 +678,7 @@ html.calm *, html.calm *::before, html.calm *::after { transition-duration: .01s
       <div class="home-side">
         <div class="stage hero rise">
           <div class="mimi-spot" role="button" tabindex="0" aria-label="ミミにさわる"></div>
-          <div class="bubble" data-tail="left" aria-live="polite"><p class="bubble-text"></p></div>
+          <div class="bubble" data-tail="left" aria-hidden="true"><p class="bubble-text"></p></div>
         </div>
         <div class="tip rise">
           <svg class="icon"><use href="#i-bulb"/></svg>
@@ -673,7 +705,7 @@ html.calm *, html.calm *::before, html.calm *::after { transition-duration: .01s
           <button class="tile" type="button" data-act="drill"><span class="tile-icon c-good"><svg class="icon"><use href="#i-clock"/></svg></span><b>実戦20問</b><small id="tile-drill"></small></button>
         </div>
         <section class="card rise">
-          <h2>750点への道のり</h2>
+          <h2 id="path-title">750点への道のり</h2>
           <div>
             <div class="path-row"><span>単語</span><i class="bar sun"><i id="path-words"></i></i><b id="path-words-n"></b></div>
             <div class="path-row"><span>文法</span><i class="bar"><i id="path-grammar"></i></i><b id="path-grammar-n"></b></div>
@@ -691,7 +723,7 @@ html.calm *, html.calm *::before, html.calm *::after { transition-duration: .01s
     </header>
     <div class="stage mini rise">
       <div class="mimi-spot" role="button" tabindex="0" aria-label="ミミにさわる"></div>
-      <div class="bubble small" data-tail="left" aria-live="polite"><p class="bubble-text"></p></div>
+      <div class="bubble small" data-tail="left" aria-hidden="true"><p class="bubble-text"></p></div>
     </div>
     <div id="words-list" class="rise"></div>
   </section>
@@ -705,7 +737,7 @@ html.calm *, html.calm *::before, html.calm *::after { transition-duration: .01s
     </header>
     <div class="stage mini rise">
       <div class="mimi-spot" role="button" tabindex="0" aria-label="ミミにさわる"></div>
-      <div class="bubble small" data-tail="left" aria-live="polite"><p class="bubble-text"></p></div>
+      <div class="bubble small" data-tail="left" aria-hidden="true"><p class="bubble-text"></p></div>
     </div>
     <div class="deck rise" id="deck"><div class="deck-ghost g2"></div><div class="deck-ghost g1"></div></div>
     <div class="deck-actions rise" id="deck-actions">
@@ -729,7 +761,7 @@ html.calm *, html.calm *::before, html.calm *::after { transition-duration: .01s
     </header>
     <div class="stage mini rise">
       <div class="mimi-spot" role="button" tabindex="0" aria-label="ミミにさわる"></div>
-      <div class="bubble small" data-tail="left" aria-live="polite"><p class="bubble-text"></p></div>
+      <div class="bubble small" data-tail="left" aria-hidden="true"><p class="bubble-text"></p></div>
     </div>
     <div class="duo rise">
       <button class="tile" type="button" id="g-drill"><span class="tile-icon c-good"><svg class="icon"><use href="#i-clock"/></svg></span><b>実戦20問</b><small id="g-drill-sub"></small></button>
@@ -748,7 +780,7 @@ html.calm *, html.calm *::before, html.calm *::after { transition-duration: .01s
     </header>
     <div class="stage mini rise">
       <div class="mimi-spot" role="button" tabindex="0" aria-label="ミミにさわる"></div>
-      <div class="bubble small" data-tail="left" aria-live="polite"><p class="bubble-text"></p></div>
+      <div class="bubble small" data-tail="left" aria-hidden="true"><p class="bubble-text"></p></div>
     </div>
     <article class="lcard rise" id="lcard" aria-live="polite"></article>
     <div class="foot">
@@ -769,7 +801,7 @@ html.calm *, html.calm *::before, html.calm *::after { transition-duration: .01s
     <div class="quiz-body">
       <aside class="quiz-side">
         <div class="mimi-spot" role="button" tabindex="0" aria-label="ミミにさわる"></div>
-        <div class="bubble small" data-tail="left" aria-live="polite"><p class="bubble-text"></p></div>
+        <div class="bubble small" data-tail="left" aria-hidden="true"><p class="bubble-text"></p></div>
         <div class="timer" id="timer" hidden role="timer" aria-label="残り時間">
           <svg viewBox="0 0 64 64"><circle class="timer-track" cx="32" cy="32" r="27"/><circle class="timer-bar" id="timer-bar" cx="32" cy="32" r="27"/></svg>
           <b id="timer-num">20</b>
@@ -792,7 +824,7 @@ html.calm *, html.calm *::before, html.calm *::after { transition-duration: .01s
       <div>
         <div class="stage hero rise">
           <div class="mimi-spot" role="button" tabindex="0" aria-label="ミミにさわる"></div>
-          <div class="bubble" data-tail="left" aria-live="polite"><p class="bubble-text"></p></div>
+          <div class="bubble" data-tail="left" aria-hidden="true"><p class="bubble-text"></p></div>
         </div>
         <div class="score rise">
           <div class="ring">
@@ -856,7 +888,8 @@ html.calm *, html.calm *::before, html.calm *::after { transition-duration: .01s
     </section>
     <section class="card rise">
       <h2>記録の引き継ぎ</h2>
-      <p class="note">記録はこの端末の中だけに保存されます。機種変更やホーム画面への追加し直しの前に、引き継ぎコードを作ってメモしておいてください。</p>
+      <p class="note">記録はこの端末の中だけに保存されます。機種変更やアプリの入れ直しの前に、引き継ぎコードを作ってメモしておいてください。</p>
+      <p class="note" id="export-last"></p>
       <div class="row-btns"><button class="btn ghost" id="export-btn" type="button">引き継ぎコードを作る</button><button class="btn ghost" id="import-btn" type="button">コードを読み込む</button></div>
       <div id="transfer" hidden>
         <textarea class="field" id="transfer-text" spellcheck="false" aria-label="引き継ぎコード"></textarea>
@@ -865,8 +898,19 @@ html.calm *, html.calm *::before, html.calm *::after { transition-duration: .01s
       </div>
       <div class="row-btns"><button class="btn bad" id="erase-btn" type="button">記録をすべて消す</button></div>
     </section>
+    <section class="card faq rise">
+      <h2>使い方</h2>
+      <div>
+        <details><summary>毎日なにをすればいい？</summary><p>ホームの「今日のレッスン」を1回やるだけで大丈夫です。新しい単語・文法・復習を、1日の目標の問題数に合わせて組み立てます。</p></details>
+        <details><summary>まちがえた問題はどうなる？</summary><p>その日のうちに「苦手を復習」に入ります。正解が続くと、1日後・3日後・7日後・14日後・30日後と、間をあけてもう一度出します。忘れかけたころに解くと、記憶に残りやすいからです。</p></details>
+        <details><summary>「定着」ってなに？</summary><p>単語は、3回続けて正解すると「定着」です（まちがえると数え直し）。文法は、最後に解いたときに正解した問題を数えます。</p></details>
+        <details><summary>タイマーは変えられる？</summary><p>設定の「文法の1問の時間」で、10秒・15秒・20秒・30秒・なしから選べます。本番の Part 5 は1問20秒が目安です。</p></details>
+        <details><summary>記録はどこに保存される？</summary><p>この端末の中だけです。外へは送りません。機種変更のときは「記録の引き継ぎ」のコードを使ってください。</p></details>
+      </div>
+    </section>
     <section class="card about rise">
       <p>ミミとTOEIC。問題と例文はこのアプリのために書いたものです。動きは GSAP（gsap.com、無料の Standard License）で作っています。</p>
+      <p><a href="privacy.html">プライバシーポリシー</a></p>
       <p>TOEIC is a registered trademark of ETS. This product is not endorsed or approved by ETS.</p>
       <p id="about-version"></p>
     </section>
@@ -885,6 +929,13 @@ html.calm *, html.calm *::before, html.calm *::after { transition-duration: .01s
 
 <div class="fx" id="fx" aria-hidden="true"></div>
 <div class="navfade" aria-hidden="true"></div>
+<!-- ミミのせりふを読み上げソフトへ1文まとめて伝える（見た目のふきだしは1文字ずつ動くので、読み上げからは外している） -->
+<p class="sr" id="sr-say" aria-live="polite"></p>
+<div class="toast" id="toast" role="status" hidden>
+  <p id="toast-text">新しい版になりました</p>
+  <button class="btn" id="toast-go" type="button">今すぐ使う</button>
+  <button class="toast-x" id="toast-x" type="button" aria-label="閉じる"><svg class="icon"><use href="#i-close"/></svg></button>
+</div>
 <div id="saProbe" aria-hidden="true"></div>
 
 <dialog class="ask" id="ask">

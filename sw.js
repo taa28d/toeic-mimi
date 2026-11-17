@@ -1,10 +1,12 @@
 // アプリのファイルを端末に保存し、通信がなくても開けるようにする。
-// 開くときは保存済みのものをすぐ表示し、裏で新しい版を取りに行く（次に開いたときに反映）。
+// 版（CACHE）ごとに全部のファイルをまとめて保存し、その版のファイルだけを返す（古い版と新しい版が混ざらない）。
+// sw.js が変わるとブラウザが新しい版を取りに来て、届いたらすぐ切り替える。画面には「新しい版になりました」と出る。
 // ファイルを直したら CACHE の番号を上げる。
-const CACHE = 'toeic-mimi-v7';
+const CACHE = 'toeic-mimi-v8';
 const FILES = [
   './',
   './index.html',
+  './privacy.html',
   './manifest.webmanifest',
   './js/app.js',
   './js/mimi.js',
@@ -20,23 +22,25 @@ const FILES = [
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/icon-maskable-512.png',
+  './icons/icon-monochrome-512.png',
   './icons/apple-touch-icon.png',
 ];
 
 self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE)
-      .then(cache => cache.addAll(FILES))
-      .then(() => self.skipWaiting()),
-  );
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE);
+    // ブラウザの一時保存（GitHub Pages は10分）を通さず、公開されたばかりのファイルを取る
+    await cache.addAll(FILES.map(url => new Request(url, { cache: 'reload' })));
+    await self.skipWaiting();
+  })());
 });
 
 self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys()
-      .then(names => Promise.all(names.filter(name => name !== CACHE).map(name => caches.delete(name))))
-      .then(() => self.clients.claim()),
-  );
+  event.waitUntil((async () => {
+    const names = await caches.keys();
+    await Promise.all(names.filter(name => name !== CACHE).map(name => caches.delete(name)));
+    await self.clients.claim();
+  })());
 });
 
 self.addEventListener('fetch', event => {
@@ -45,19 +49,15 @@ self.addEventListener('fetch', event => {
 
   event.respondWith((async () => {
     const cache = await caches.open(CACHE);
+    // ?go=daily などのつきは同じページとして扱う
     const saved = await cache.match(request, { ignoreSearch: true });
-    const latest = fetch(request).then(response => {
-      if (response.ok) cache.put(request, response.clone());
-      return response;
-    });
-    if (saved) {
-      event.waitUntil(latest.catch(() => {}));
-      return saved;
-    }
+    if (saved) return saved;
     try {
-      return await latest;
+      const response = await fetch(request);
+      if (response.ok && new URL(request.url).pathname.includes('/icons/')) cache.put(request, response.clone());
+      return response;
     } catch (error) {
-      if (request.mode === 'navigate') return cache.match('./index.html');
+      if (request.mode === 'navigate') return (await cache.match('./index.html')) || Response.error();
       throw error;
     }
   })());

@@ -8,7 +8,7 @@
   const hasDraw = Boolean(window.DrawSVGPlugin);
   const hasPhysics = Boolean(window.Physics2DPlugin);
   if (window.CustomWiggle) window.CustomWiggle.create('errShake', { wiggles: 3, type: 'easeOut' });
-  const VERSION = '1.1.3';
+  const VERSION = '1.2.0';
   const NS = 'http://www.w3.org/2000/svg';
 
   const LINES = window.MIMI_LINES;
@@ -126,9 +126,13 @@
   }
   matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', syncThemeColor);
 
-  /* ━━ 4. 英語の読み上げ（Web Speech API） ━━ */
+  /* ━━ 4. 英語の読み上げ（Web Speech API） ━━
+     ストア版（Capacitor で包んだアプリ）では、Android の WebView に Web Speech API がないので、
+     端末の読み上げ機能（@capacitor-community/text-to-speech）を使う。どちらでも同じ呼び方で使える */
+  const isNative = Boolean(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+  const nativeTTS = isNative && window.Capacitor.Plugins ? window.Capacitor.Plugins.TextToSpeech || null : null;
   const speech = (() => {
-    const synth = window.speechSynthesis || null;
+    const synth = nativeTTS ? null : window.speechSynthesis || null;
     let voice = null;
     let primed = false;
     function choose() {
@@ -151,13 +155,32 @@
       synth.speak(silent);
     }
     let token = 0; // 読み上げを始めるたび・止めるたびに増やす。遅らせた読み上げや続きの文を取り消す目印
+    let nativeBusy = false;
     function stop() {
       token++;
+      if (nativeTTS) { if (nativeBusy) nativeTTS.stop().catch(() => {}); nativeBusy = false; return; }
       if (synth && (synth.speaking || synth.pending)) synth.cancel();
+    }
+    // 端末の読み上げ機能で読む（ストア版）。読み終わると Promise が解ける
+    function speakNative(text, rate, onEnd) {
+      const busy = nativeBusy;
+      stop();
+      const mine = token;
+      const go = () => {
+        if (mine !== token) { if (onEnd) onEnd({ error: 'canceled' }); return; }
+        nativeBusy = true;
+        nativeTTS.speak({ text, lang: 'en-US', rate, pitch: 1, volume: 1, category: 'ambient' })
+          .then(() => { if (mine === token) nativeBusy = false; if (onEnd) onEnd(mine === token ? {} : { error: 'canceled' }); })
+          .catch(() => { if (mine === token) nativeBusy = false; if (onEnd) onEnd({ error: 'failed' }); });
+      };
+      if (busy) setTimeout(go, 150);
+      else go();
+      return true;
     }
     // iPhone の Safari は、読んでいる途中を止めた直後に次を読ませると、黙って読み飛ばすことがある。
     // 止めたときは少し待ってから読む
     function speak(text, { rate = .92, onEnd } = {}) {
+      if (nativeTTS) return speakNative(text, rate, onEnd);
       if (!synth) { if (onEnd) onEnd(); return false; }
       const busy = synth.speaking || synth.pending;
       stop();
@@ -179,7 +202,7 @@
     // いくつかの文を順に読む（単語 → 例文）。ボタンは読んでいるあいだ動かす。
     // 途中でほかの読み上げが始まったり止めたりしたら、残りは読まない
     function speakList(items) {
-      if (!synth || !items.length) return false;
+      if ((!synth && !nativeTTS) || !items.length) return false;
       const next = i => {
         const item = items[i];
         if (item.btn) item.btn.classList.add('on');
@@ -200,7 +223,7 @@
       choose();
       if (synth.addEventListener) synth.addEventListener('voiceschanged', choose);
     }
-    return { speak, speakList, stop, prime, supported: Boolean(synth) };
+    return { speak, speakList, stop, prime, supported: Boolean(synth || nativeTTS) };
   })();
 
   /* ━━ 5. 効果音（Web Audio API でその場で合成。音声ファイルは使わない） ━━ */
@@ -323,7 +346,14 @@
       },
       flip: a => noise(a, { len: .13, vol: .05, freq: 2400 }),
       whoosh: a => noise(a, { len: .24, vol: .06, freq: 1100 }),
-      fanfare: a => [0, 4, 7, 12].forEach((st, i) => tone(a, { type: 'triangle', from: 523.25 * 2 ** (st / 12), at: i * .09, len: .3, vol: .15 })),
+      // 目標達成・カードを見終えたとき：レベルアップと同じ鈴の音色で、短く明るく（ド・ミ・ソ・ド → ミ・ソ → きらめき）
+      fanfare: a => {
+        const out = sparkleBus(a);
+        const note = n => 523.25 * 2 ** (n / 12);
+        [0, 4, 7, 12].forEach((n, i) => bell(a, out, { freq: note(n), at: i * .07, len: .7, vol: .055 }));
+        [16, 19].forEach((n, i) => bell(a, out, { freq: note(n), at: .3 + i * .05, len: 1.1, vol: .042 }));
+        [24, 28, 31].forEach((n, i) => bell(a, out, { freq: note(n), at: .45 + i * .09, len: .35, vol: .02 }));
+      },
       // レベルアップ：魔法をかけたような、きらきらした音（ハ長調）。n はド（C5）から数えた半音
       levelUp: a => {
         const out = sparkleBus(a);
@@ -475,8 +505,11 @@
   document.querySelectorAll('.screen').forEach(screen => { screens[screen.id.slice(2)] = screen; });
   let current = null;
   const bubble = () => (current ? screens[current].querySelector('.bubble') : null);
+  const srSay = $('sr-say');
   function say(text, vars) {
-    return mimi.say(bubble(), fmt(text, vars), { blip: i => sound.play('blip', i) });
+    const line = fmt(text, vars);
+    srSay.textContent = line; // 読み上げソフトには1文まとめて伝える
+    return mimi.say(bubble(), line, { blip: i => sound.play('blip', i) });
   }
   function fmt(line, vars = {}) {
     const name = store.data.profile.name.trim();
@@ -556,8 +589,45 @@
       next.querySelectorAll('.bubble').forEach(b => { b.querySelector('.bubble-text').textContent = ''; gsap.set(b, { opacity: 0 }); });
       if (moved && current) mimi.hop(12);
       enter(next);
+      // 押したボタンが前の画面ごと隠れたら、キーボードや読み上げソフトの位置を新しい画面へ移す
+      const active = document.activeElement;
+      if (active && active !== document.body && active.closest('.screen[hidden]')) {
+        next.tabIndex = -1;
+        next.focus({ preventScroll: true });
+      }
     }
     current = name;
+    syncHistory(name);
+  }
+
+  /* Android の戻るボタン（とブラウザの「戻る」）。
+     ホーム以外の画面にいるあいだは、履歴に「しおり」を1つだけ置く。戻るを押すとしおりが消えて popstate が届くので、
+     そのとき1つ上の画面へ移る。ホームで戻ると、Android のふつうの動きどおりアプリを閉じる */
+  let guarded = Boolean(history.state && history.state.mimi); // 再読み込みしたとき、しおりの上にいることがある
+  let dropping = false; // こちらから history.back() でしおりを片づけている最中
+  function syncHistory(name) {
+    const root = name === 'home' || name === 'welcome';
+    if (!root && !guarded) {
+      history.pushState({ mimi: 1 }, '');
+      guarded = true;
+    } else if (root && guarded) {
+      guarded = false;
+      dropping = true;
+      history.back();
+    }
+  }
+  window.addEventListener('popstate', e => {
+    if (dropping) { dropping = false; return; }
+    if (e.state && e.state.mimi) { guarded = true; return; } // 「進む」でしおりへ戻ってきた
+    guarded = false;
+    goUp();
+  });
+  function goUp() {
+    if (document.getElementById('ask').open) return;
+    if (current === 'quiz') { askQuit(); return; }
+    if (current === 'cards') { openWords(); return; }
+    if (current === 'lesson') { openGrammar(); return; }
+    if (['words', 'grammar', 'records', 'result'].includes(current)) goHome(current === 'result');
   }
 
   // 画面に入るときの動き：上のまとまりから順に、下から浮かび上がる（合計0.4秒以内）
@@ -821,9 +891,12 @@
     $('today-go-label').textContent = done ? 'もう1セットやる' : today.q > 0 ? 'つづきをやる' : 'はじめる';
 
     const learned = WORDS.filter(wordLearned).length;
+    const studied = WORDS.filter(w => store.data.words[w.id]).length;
     const mastered = GRAMMAR.filter(gramMastered).length;
     const due = dueWords().length + dueGrammar().length;
-    $('tile-words').textContent = `定着 ${learned} / ${WORDS.length}語`;
+    // 定着（3回続けて正解）は時間がかかるので、学習を始めた語の数もいっしょに見せる
+    $('tile-words').textContent = `学習 ${studied}・定着 ${learned} / ${WORDS.length}語`;
+    $('path-title').textContent = `${d.profile.goal}点への道のり`;
     $('tile-grammar').textContent = `正解 ${mastered} / ${GRAMMAR.length}問`;
     $('tile-review').textContent = due ? `${due}問たまっています` : 'いまはありません';
     $('tile-review-btn').disabled = !due;
@@ -1009,7 +1082,12 @@
       });
     }
     quizEls.explain.replaceChildren();
-    $('quiz-count').textContent = `${round.i + 1} / ${round.items.length}`;
+    // 数え方：覚えるだけのカードは「覚える 3/6」、問題は「5 / 20」（目標の問題数と同じ数え方）
+    const intro = q.kind === 'intro';
+    const sameKind = item => (item.type === 'intro') === intro;
+    const nth = round.items.slice(0, round.i + 1).filter(sameKind).length;
+    const all = round.items.filter(sameKind).length;
+    $('quiz-count').textContent = intro ? `覚える ${nth}/${all}` : `${nth} / ${all}`;
     setBar($('quiz-bar'), round.i / round.items.length, .5);
   }
 
@@ -1303,14 +1381,17 @@
     speech.stop();
     nextQuestion();
   });
-  $('quiz-close').addEventListener('click', async () => {
+  // やめる（×ボタンと Android の戻るボタン）。1問も答えていなければ、そのままホームへ
+  async function askQuit() {
     if (!round || !round.results.length) { round = null; goHome(); return; }
     const pausedTimer = timer.tl;
     if (pausedTimer) pausedTimer.pause();
     const yes = await ask('ここでやめる？', 'ここまでに答えた問題は、ちゃんと記録されているよ。', 'やめる');
-    if (yes) finishRound();
-    else if (pausedTimer && timer.tl === pausedTimer) pausedTimer.resume();
-  });
+    if (yes) { finishRound(); return; }
+    if (pausedTimer && timer.tl === pausedTimer) pausedTimer.resume();
+    syncHistory('quiz'); // 戻るボタンで消えたしおりを置き直す
+  }
+  $('quiz-close').addEventListener('click', askQuit);
 
   /* ━━ 15. 結果 ━━ */
   function finishRound() {
@@ -1332,7 +1413,7 @@
 
   function renderResult(r, n, ok) {
     const rate = Math.round((ok / n) * 100);
-    $('result-title').textContent = `${r.title}　${ok} / ${n}問`;
+    $('result-title').textContent = `${r.title}　${n}問`;
     countTo($('result-rate'), rate, { dur: 1 });
     setRing($('result-ring'), rate / 100, { dur: 1.1 });
     const timed = r.results.filter(x => x.q.timed);
@@ -1493,7 +1574,8 @@
     box.replaceChildren();
     LEVELS.forEach(level => {
       const head = make('div', 'level-head');
-      head.append(make('b', null, `Lv.${level.level}`), make('h2', null, level.name), make('small', null, level.note));
+      // 「Lv.」は自分のレベル（Lv.3 など）とまぎれるので、単語の段階は STEP と呼ぶ
+      head.append(make('b', null, `STEP ${level.level}`), make('h2', null, level.name), make('small', null, level.note));
       const list = make('div', 'sets');
       SETS.filter(set => set.level === level.level).forEach(set => {
         const done = set.words.filter(wordLearned).length;
@@ -1837,7 +1919,16 @@
     });
     document.querySelectorAll('[data-toggle]').forEach(sw => sw.setAttribute('aria-checked', String(Boolean(d.settings[sw.dataset.toggle]))));
     $('about-version').textContent = `バージョン ${VERSION} ・ 単語 ${WORDS.length}語 ・ 文法 ${GRAMMAR.length}問`;
+    renderExportLast();
     renderInstall();
+  }
+  function renderExportLast() {
+    const at = store.data.lastExport;
+    const days = at ? Math.floor((Date.now() - at) / 864e5) : null;
+    const date = at ? new Date(at) : null;
+    $('export-last').textContent = !at
+      ? 'まだ引き継ぎコードを作っていません。'
+      : `前回コードを作った日：${date.getMonth() + 1}月${date.getDate()}日${days >= 14 ? '（そろそろ新しいコードを作っておくと安心です）' : ''}`;
   }
   // ふつうの月のカレンダー（月曜はじまり）。問題を解くかカードをめくった日に色をつける
   let calMonth = null;
@@ -1929,6 +2020,9 @@
     $('transfer-text').readOnly = true;
     $('transfer-go').textContent = 'コピーする';
     $('transfer-note').textContent = 'このコードを、メモなどに保存しておいてください。';
+    store.data.lastExport = Date.now();
+    store.save();
+    renderExportLast();
   });
   $('import-btn').addEventListener('click', () => {
     transferMode = 'import';
@@ -2045,7 +2139,8 @@
   });
 
   /* ━━ 23. アプリとして使う（PWA） ━━ */
-  const isOwnPage = window.top === window.self && /^https?:$/.test(location.protocol);
+  // ストア版（Capacitor）ではファイルがアプリの中にあるので、Service Worker と「ホーム画面に追加」は使わない
+  const isOwnPage = window.top === window.self && /^https?:$/.test(location.protocol) && !isNative;
   const isInstalled = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
   const isAppleTouch = /iPhone|iPad/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   let installEvent = null;
@@ -2058,8 +2153,29 @@
   window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvent = e; renderInstall(); });
   window.addEventListener('appinstalled', () => { installEvent = null; renderInstall(); });
   $('install-btn').addEventListener('click', () => { const e = installEvent; installEvent = null; renderInstall(); if (e) e.prompt(); });
+  // 新しい版が届いたら知らせる。Service Worker は届いた版をすぐ有効にするので、読み込み直せば新しい版になる。
+  // 問題の途中で勝手に読み込み直すと困るので、ボタンを押したときだけ読み込み直す
+  function showUpdateToast() {
+    const toast = $('toast');
+    if (!toast.hidden) return;
+    toast.hidden = false;
+    if (!calm()) gsap.fromTo(toast, { y: 30, opacity: 0 }, { y: 0, opacity: 1, duration: .45, ease: 'back.out(1.6)', clearProps: 'transform,opacity' });
+  }
+  $('toast-go').addEventListener('click', () => location.reload());
+  $('toast-x').addEventListener('click', () => { $('toast').hidden = true; });
   if (isOwnPage && 'serviceWorker' in navigator) {
-    window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => { /* 使えなくても普通のページとして動く */ }); });
+    const hadController = Boolean(navigator.serviceWorker.controller); // 初めて開いたときは知らせない
+    navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadController) showUpdateToast(); });
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').then(reg => {
+        // アプリを開いたまま何日も使う人のために、画面に戻ってきたときにも新しい版を確かめる
+        document.addEventListener('visibilitychange', () => { if (!document.hidden) reg.update().catch(() => {}); });
+      }).catch(() => { /* 使えなくても普通のページとして動く */ });
+    });
+  }
+  // 記録が端末の空き容量の整理で消されにくくなるよう、残しておきたいことをブラウザに伝える
+  if (navigator.storage && navigator.storage.persist) {
+    navigator.storage.persisted().then(done => (done ? null : navigator.storage.persist())).catch(() => {});
   }
 
   /* ━━ 24. はじめる ━━ */
@@ -2069,8 +2185,14 @@
   setupAmbient();
   mimi.startIdle();
   reduceQuery.addEventListener?.('change', applyMotion);
-  if (store.data.onboarded) goHome();
-  else startWelcome();
+  if (store.data.onboarded) {
+    goHome();
+    // ホーム画面のアイコンを長押ししたときのメニュー（manifest の shortcuts）から開いたとき
+    const go = new URLSearchParams(location.search).get('go');
+    const open = { daily: startDaily, words: openWords, grammar: openGrammar, review: startReview }[go];
+    if (go) history.replaceState(history.state, '', location.pathname + location.hash);
+    if (open) open();
+  } else startWelcome();
   if (location.hash === '#debug') showDebug();
 
   // 自動テスト用の入口。テストのときだけ外から渡される
