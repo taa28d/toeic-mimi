@@ -8,7 +8,7 @@
   const hasDraw = Boolean(window.DrawSVGPlugin);
   const hasPhysics = Boolean(window.Physics2DPlugin);
   if (window.CustomWiggle) window.CustomWiggle.create('errShake', { wiggles: 3, type: 'easeOut' });
-  const VERSION = '1.1.2';
+  const VERSION = '1.1.3';
   const NS = 'http://www.w3.org/2000/svg';
 
   const LINES = window.MIMI_LINES;
@@ -218,7 +218,7 @@
         return ctx;
       } catch { return null; }
     }
-    function tone(a, { type = 'sine', from, to = from, at = 0, len, vol, attack = .006 }) {
+    function tone(a, { type = 'sine', from, to = from, at = 0, len, vol, attack = .006, out = a.destination }) {
       const t = a.currentTime + at;
       const osc = a.createOscillator();
       const gain = a.createGain();
@@ -228,11 +228,61 @@
       gain.gain.setValueAtTime(.0001, t);
       gain.gain.exponentialRampToValueAtTime(vol, t + attack);
       gain.gain.exponentialRampToValueAtTime(.0001, t + len);
-      osc.connect(gain).connect(a.destination);
+      osc.connect(gain).connect(out);
       osc.start(t);
       osc.stop(t + len + .02);
     }
-    function noise(a, { at = 0, len = .15, vol = .06, freq = 1600, q = .8 }) {
+    // 鈴のような音（チェレスタ風）。基音に倍音を少し重ね、高い倍音ほど早く消える
+    function bell(a, out, { freq, at = 0, len = 1, vol = .05 }) {
+      const t = a.currentTime + at;
+      const master = a.createGain();
+      master.gain.setValueAtTime(.0001, t);
+      master.gain.exponentialRampToValueAtTime(vol, t + .005);
+      master.gain.exponentialRampToValueAtTime(.0001, t + len);
+      master.connect(out);
+      [[1, 1], [2, .4], [3, .14], [4.2, .07]].forEach(([mult, amp], k) => {
+        if (freq * mult > a.sampleRate * .45) return; // 高すぎる倍音は鳴らさない
+        const osc = a.createOscillator();
+        const gain = a.createGain();
+        osc.frequency.value = freq * mult;
+        gain.gain.setValueAtTime(amp, t);
+        gain.gain.exponentialRampToValueAtTime(.0001, t + len / (1 + k * 1.6));
+        osc.connect(gain).connect(master);
+        osc.start(t);
+        osc.stop(t + len + .05);
+      });
+    }
+    // きらめき用の出口：広い部屋のような余韻（減っていく雑音を響きの型にする）をつけ、
+    // 音が重なって割れないよう、大きすぎるところを自動で抑える
+    const sparkleBuses = new WeakMap();
+    function sparkleBus(a) {
+      let bus = sparkleBuses.get(a);
+      if (bus) return bus;
+      const len = Math.floor(a.sampleRate * 2);
+      const ir = a.createBuffer(2, len, a.sampleRate);
+      for (let ch = 0; ch < 2; ch++) {
+        const d = ir.getChannelData(ch);
+        for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len) ** 3;
+      }
+      const verb = a.createConvolver();
+      verb.buffer = ir;
+      const wet = a.createGain();
+      wet.gain.value = .5;
+      const limit = a.createDynamicsCompressor();
+      limit.threshold.value = -16;
+      limit.ratio.value = 6;
+      limit.attack.value = .003;
+      limit.release.value = .25;
+      const lift = a.createGain(); // お祝いの音なので、ほかの効果音より少し大きく
+      lift.gain.value = 1.5;
+      bus = a.createGain();
+      bus.connect(limit);
+      bus.connect(verb).connect(wet).connect(limit);
+      limit.connect(lift).connect(a.destination);
+      sparkleBuses.set(a, bus);
+      return bus;
+    }
+    function noise(a, { at = 0, len = .15, vol = .06, freq = 1600, q = .8, out = a.destination }) {
       if (!noiseBuf) {
         noiseBuf = a.createBuffer(1, Math.floor(a.sampleRate * .4), a.sampleRate);
         const ch = noiseBuf.getChannelData(0);
@@ -250,7 +300,7 @@
       gain.gain.setValueAtTime(.0001, t);
       gain.gain.exponentialRampToValueAtTime(vol, t + len * .3);
       gain.gain.exponentialRampToValueAtTime(.0001, t + len);
-      src.connect(filter).connect(gain).connect(a.destination);
+      src.connect(filter).connect(gain).connect(out);
       src.start(t);
       src.stop(t + len + .02);
     }
@@ -274,18 +324,37 @@
       flip: a => noise(a, { len: .13, vol: .05, freq: 2400 }),
       whoosh: a => noise(a, { len: .24, vol: .06, freq: 1100 }),
       fanfare: a => [0, 4, 7, 12].forEach((st, i) => tone(a, { type: 'triangle', from: 523.25 * 2 ** (st / 12), at: i * .09, len: .3, vol: .15 })),
-      levelUp: a => [0, 4, 7, 12, 16, 19].forEach((st, i) => tone(a, { type: 'triangle', from: 440 * 2 ** (st / 12), at: i * .075, len: .32, vol: .14 })),
+      // レベルアップ：魔法をかけたような、きらきらした音（ハ長調）。n はド（C5）から数えた半音
+      levelUp: a => {
+        const out = sparkleBus(a);
+        const note = n => 523.25 * 2 ** (n / 12);
+        // ① 杖をふったように駆け上がるきらめき（ド・レ・ミ・ソ・ラを2オクターブ）
+        [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24, 26, 28].forEach((n, i) => {
+          bell(a, out, { freq: note(n), at: i * .032, len: .55, vol: .035 + i * .003 });
+        });
+        // ② 花が開くような和音（ド・ミ・ソ・シ・レ・ソ）と、下で支えるやわらかい音
+        [0, 4, 7, 11, 14, 19].forEach((n, i) => bell(a, out, { freq: note(n), at: .42 + i * .012, len: 1.9, vol: .05 }));
+        tone(a, { from: note(-12), at: .42, len: 1.6, vol: .05, attack: .08, out });
+        tone(a, { from: note(-5), at: .42, len: 1.4, vol: .025, attack: .08, out });
+        // ③ あとから舞う、小さな星のまたたき
+        [28, 31, 33, 36, 31, 33, 28, 36, 31, 35].forEach((n, i) => {
+          bell(a, out, { freq: note(n), at: .55 + i * .11 + Math.random() * .05, len: .35, vol: .018 + Math.random() * .014 });
+        });
+        // ④ 妖精の粉のような、かすかなシャラララ
+        noise(a, { at: .05, len: 1.1, vol: .018, freq: 7000, q: .6, out });
+      },
       pop: a => tone(a, { from: 320, to: 960, len: .09, vol: .1 }),
       blip: (a, i = 0) => tone(a, { from: 620 + (i % 3) * 70 + Math.random() * 50, to: 760 + Math.random() * 80, len: .055, vol: .04 }),
     };
-    function play(name, arg) {
+    // force：設定で音を切っていても鳴らす（設定画面の「聞いてみる」）
+    function play(name, arg, { force = false } = {}) {
       const s = store.data.settings;
-      if (name === 'blip' ? !s.voice : !s.sound) return;
+      if (!force && (name === 'blip' ? !s.voice : !s.sound)) return;
       const a = ready();
       if (!a) return;
       try { draw[name](a, arg); } catch { /* 音が出せなくても続ける */ }
     }
-    return { play, ready };
+    return { play, ready, draw };
   })();
   // Android だけ短く震わせる。画面に触れる前は、ブラウザが振動を許さない
   const buzz = pattern => {
@@ -1839,6 +1908,7 @@
     sw.setAttribute('aria-checked', String(store.data.settings[key]));
     if (key === 'voice' && store.data.settings.voice) say('この声、聞こえる？');
   }));
+  $('sound-try').addEventListener('click', () => sound.play('levelUp', null, { force: true }));
   function applyMotion() {
     syncMotion();
     setupAmbient();
@@ -2006,7 +2076,7 @@
   // 自動テスト用の入口。テストのときだけ外から渡される
   if (window.__TOEIC_HOOK__) {
     window.__TOEIC_HOOK__({
-      store, mimi, WORDS, GRAMMAR, SETS, CATS, composeDaily, levelInfo, wordChoices, overlaps, senses,
+      store, mimi, sound, WORDS, GRAMMAR, SETS, CATS, composeDaily, levelInfo, wordChoices, overlaps, senses,
       startDaily, startDrill, startCatQuiz, startCards, openLesson, goHome, openWords, openGrammar, openRecords,
       answer: i => answer(i), rightIndex: () => round?.q?.choices?.findIndex(c => c.right) ?? -1,
       next: () => quizEls.next.click(), currentRound: () => round, currentScreen: () => current, deck: () => deck,

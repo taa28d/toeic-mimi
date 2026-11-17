@@ -523,6 +523,7 @@ html.bars-themed .tabs { background: var(--bg); -webkit-backdrop-filter: none; b
 .setting small { display: block; color: var(--muted); font-weight: 600; font-size: .8rem; margin-top: 2px; }
 .setting .field { margin-top: 8px; min-height: 46px; font-size: 1rem; }
 .seg { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.sound-try { margin-top: 8px; font-size: .85rem; }
 .seg button { flex: 1; min-width: 3.4em; height: 40px; border-radius: 12px; background: var(--sunken); font-weight: 800; font-size: .88rem; color: var(--muted); transition: transform var(--spring-dur) var(--spring); }
 .seg button:active, .seg button.is-pressed { transform: scale(.92); transition-duration: .08s; }
 .seg button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
@@ -841,7 +842,7 @@ html.calm *, html.calm *::before, html.calm *::after { transition-duration: .01s
         <div class="setting"><label class="setting-row" for="set-name"><span>呼び名<small>ミミが呼ぶときの名前</small></span></label><input class="field" id="set-name" maxlength="12" placeholder="なし" autocomplete="nickname"></div>
         <div class="setting"><div class="setting-row">1日の目標</div><div class="seg" data-set="daily"><button type="button" data-v="10">10問</button><button type="button" data-v="20">20問</button><button type="button" data-v="30">30問</button></div></div>
         <div class="setting"><div class="setting-row">文法の1問の時間</div><div class="seg" data-set="timer"><button type="button" data-v="10">10秒</button><button type="button" data-v="15">15秒</button><button type="button" data-v="20">20秒</button><button type="button" data-v="30">30秒</button><button type="button" data-v="0">なし</button></div></div>
-        <div class="setting"><div class="setting-row"><span>効果音<small>正解・不正解・残り時間の音</small></span><button class="switch" type="button" role="switch" data-toggle="sound" aria-label="効果音"></button></div></div>
+        <div class="setting"><div class="setting-row"><span>効果音<small>正解・不正解・残り時間の音</small></span><button class="switch" type="button" role="switch" data-toggle="sound" aria-label="効果音"></button></div><button class="link sound-try" id="sound-try" type="button">レベルアップの音を聞いてみる</button></div>
         <div class="setting"><div class="setting-row"><span>ミミの声<small>話すときの小さな音</small></span><button class="switch" type="button" role="switch" data-toggle="voice" aria-label="ミミの声"></button></div></div>
         <div class="setting"><div class="setting-row"><span>単語を自動で読み上げる<small>問題やカードに単語が出たときに発音する</small></span><button class="switch" type="button" role="switch" data-toggle="speak" aria-label="単語を自動で読み上げる"></button></div></div>
         <div class="setting"><div class="setting-row"><span>答えたあと例文を読み上げる<small>文法は正解を入れた文、単語は単語と例文を発音する</small></span><button class="switch" type="button" role="switch" data-toggle="speakAfter" aria-label="答えたあと例文を読み上げる"></button></div></div>
