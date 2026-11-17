@@ -1,7 +1,7 @@
 // アプリのファイルを端末に保存し、通信がなくても開けるようにする。
 // 開くときは保存済みのものをすぐ表示し、裏で新しい版を取りに行く（次に開いたときに反映）。
 // ファイルを直したら CACHE の番号を上げる。
-const CACHE = 'toeic-mimi-v5';
+const CACHE = 'toeic-mimi-v6';
 const FILES = [
   './',
   './index.html',

@@ -8,7 +8,7 @@
   const hasDraw = Boolean(window.DrawSVGPlugin);
   const hasPhysics = Boolean(window.Physics2DPlugin);
   if (window.CustomWiggle) window.CustomWiggle.create('errShake', { wiggles: 3, type: 'easeOut' });
-  const VERSION = '1.1.1';
+  const VERSION = '1.1.2';
   const NS = 'http://www.w3.org/2000/svg';
 
   const LINES = window.MIMI_LINES;
@@ -150,24 +150,57 @@
       silent.volume = 0;
       synth.speak(silent);
     }
-    function stop() { if (synth && (synth.speaking || synth.pending)) synth.cancel(); }
+    let token = 0; // 読み上げを始めるたび・止めるたびに増やす。遅らせた読み上げや続きの文を取り消す目印
+    function stop() {
+      token++;
+      if (synth && (synth.speaking || synth.pending)) synth.cancel();
+    }
+    // iPhone の Safari は、読んでいる途中を止めた直後に次を読ませると、黙って読み飛ばすことがある。
+    // 止めたときは少し待ってから読む
     function speak(text, { rate = .92, onEnd } = {}) {
       if (!synth) { if (onEnd) onEnd(); return false; }
+      const busy = synth.speaking || synth.pending;
       stop();
-      if (synth.paused) synth.resume();
-      const u = new SpeechSynthesisUtterance(text);
-      u.lang = 'en-US';
-      u.rate = rate;
-      if (voice) u.voice = voice;
-      if (onEnd) { u.onend = onEnd; u.onerror = onEnd; }
-      synth.speak(u);
+      const mine = token;
+      const go = () => {
+        if (mine !== token) { if (onEnd) onEnd({ error: 'canceled' }); return; }
+        if (synth.paused) synth.resume();
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = 'en-US';
+        u.rate = rate;
+        if (voice) u.voice = voice;
+        if (onEnd) { u.onend = onEnd; u.onerror = onEnd; }
+        synth.speak(u);
+      };
+      if (busy) setTimeout(go, 150);
+      else go();
+      return true;
+    }
+    // いくつかの文を順に読む（単語 → 例文）。ボタンは読んでいるあいだ動かす。
+    // 途中でほかの読み上げが始まったり止めたりしたら、残りは読まない
+    function speakList(items) {
+      if (!synth || !items.length) return false;
+      const next = i => {
+        const item = items[i];
+        if (item.btn) item.btn.classList.add('on');
+        speak(item.text, {
+          rate: item.rate,
+          onEnd: e => {
+            if (item.btn) item.btn.classList.remove('on');
+            if ((e && e.error) || i + 1 >= items.length) return;
+            const mine = token;
+            setTimeout(() => { if (mine === token) next(i + 1); }, 300);
+          },
+        });
+      };
+      next(0);
       return true;
     }
     if (synth) {
       choose();
       if (synth.addEventListener) synth.addEventListener('voiceschanged', choose);
     }
-    return { speak, stop, prime, supported: Boolean(synth) };
+    return { speak, speakList, stop, prime, supported: Boolean(synth) };
   })();
 
   /* ━━ 5. 効果音（Web Audio API でその場で合成。音声ファイルは使わない） ━━ */
@@ -1102,15 +1135,21 @@
     readAfterAnswer(q, q.choices[rightIndex].text);
   }
 
-  // 答えたあと、例文を読み上げる（設定でオフにできる）。
-  // 文法は空欄に正解を入れた文、単語はその単語の例文。効果音とミミの反応のあとに始める
+  // 答えたあと、読み上げる（設定でオフにできる）。効果音とミミの反応のあとに始める。
+  // 文法は空欄に正解を入れた文。単語は「単語 → 例文」の順（解説の🔊ボタンも、読んでいるほうが動く）
   function readAfterAnswer(q, rightText) {
     if (!store.data.settings.speakAfter || !speech.supported) return;
-    const text = q.kind === 'grammar' ? q.g.q.replace('-------', rightText) : q.word.ex;
     gsap.delayedCall(.75, () => {
       if (!round || round.q !== q || current !== 'quiz') return; // もう次の問題へ進んだ
       const buttons = quizEls.explain.querySelectorAll('.say-btn');
-      speakWith(buttons[buttons.length - 1], text, .9);
+      if (q.kind === 'grammar') {
+        speech.speakList([{ text: q.g.q.replace('-------', rightText), rate: .9, btn: buttons[0] }]);
+      } else {
+        speech.speakList([
+          { text: q.word.en, rate: .85, btn: buttons[0] },
+          { text: q.word.ex, rate: .9, btn: buttons[1] },
+        ]);
+      }
     });
   }
 
