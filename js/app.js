@@ -8,7 +8,7 @@
   const hasDraw = Boolean(window.DrawSVGPlugin);
   const hasPhysics = Boolean(window.Physics2DPlugin);
   if (window.CustomWiggle) window.CustomWiggle.create('errShake', { wiggles: 3, type: 'easeOut' });
-  const VERSION = '1.1.0';
+  const VERSION = '1.1.1';
   const NS = 'http://www.w3.org/2000/svg';
 
   const LINES = window.MIMI_LINES;
@@ -545,6 +545,24 @@
   document.addEventListener('click', e => {
     if (e.target.closest('.btn, .tile, .tab, .opt, .seg button, .set-btns button, .round-btn, .switch, .say-btn')) sound.play('tap');
   });
+  // 押した感じ：指が触れたら is-pressed を付け、離したら（短いタップでも0.11秒は見せてから）外す。
+  // iPhone の Safari は :active がほとんど出ないので、CSS の :active と同じ見た目をこのクラスでも出す
+  const PRESSABLE = '.btn, .round-btn, .tile, .opt, .choice, .set-btns button, .seg button, .say-btn';
+  document.addEventListener('pointerdown', e => {
+    const el = e.target.closest(PRESSABLE);
+    if (!el || el.disabled || el.getAttribute('aria-disabled') === 'true') return;
+    el.classList.add('is-pressed');
+    const start = performance.now();
+    const release = () => {
+      window.removeEventListener('pointerup', release);
+      window.removeEventListener('pointercancel', release);
+      setTimeout(() => el.classList.remove('is-pressed'), Math.max(0, 110 - (performance.now() - start)));
+    };
+    window.addEventListener('pointerup', release);
+    window.addEventListener('pointercancel', release);
+  });
+  document.addEventListener('touchstart', () => {}, { passive: true }); // iPhone で :active を効かせる
+
   // 最初に触れたときに、音と読み上げを使える状態にする（iPhone の決まり）
   document.addEventListener('pointerdown', () => { sound.ready(); speech.prime(); }, { once: true, capture: true });
 
@@ -913,7 +931,7 @@
       round.q = q;
       round.answered = false;
       renderQuestion(q);
-      hideFoot();
+      if (q.kind !== 'intro') hideFoot(); // 新しい単語が続くあいだは「覚えた！」を出したままにする
       enterQuestion();
       beginQuestion(q);
     };
@@ -938,7 +956,7 @@
     if (store.data.settings.speak && ['meaning', 'intro', 'listen'].includes(q.kind)) {
       gsap.delayedCall(.35, () => { if (round && round.q === q) speakWith(quizEls.card.querySelector('.say-btn'), q.word.en, .85); });
     }
-    if (q.kind === 'intro') showFoot('覚えた！');
+    if (q.kind === 'intro') showFoot('覚えた！', { rise: false });
   }
 
   /* タイマー：線形で減る輪（時間は均等に流れるので、ここだけは linear） */
@@ -1149,12 +1167,13 @@
     });
   }
 
-  function showFoot(label) {
+  // rise：下からせり上がって出す（答えたあとの「つぎへ」）。「覚えた！」はその場に出すだけ
+  function showFoot(label, { rise = true } = {}) {
     const foot = quizEls.foot;
     $('quiz-next-label').textContent = label;
     if (!foot.hidden) return;
     foot.hidden = false;
-    if (!calm()) gsap.fromTo(quizEls.next, { y: 70, opacity: 0 }, { y: 0, opacity: 1, duration: .45, ease: 'back.out(1.6)', delay: .15, clearProps: 'transform,opacity' });
+    if (rise && !calm()) gsap.fromTo(quizEls.next, { y: 70, opacity: 0 }, { y: 0, opacity: 1, duration: .45, ease: 'back.out(1.6)', delay: .15, clearProps: 'transform,opacity' });
     setTimeout(() => { if (!foot.hidden) quizEls.next.focus({ preventScroll: true }); }, 250);
   }
   function hideFoot() { quizEls.foot.hidden = true; }
