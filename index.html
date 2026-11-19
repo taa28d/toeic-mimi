@@ -328,12 +328,15 @@ html.bars-themed .tabs { background: var(--bg); -webkit-backdrop-filter: none; b
 /* 左に「STEP 3」の札（題と説明の2行ぶんの高さ）、右に題、その下に説明。題と説明は左端をそろえる
    （1行に全部並べると、狭い画面で札と題が折り返す） */
 .level-head { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 1px 12px; align-items: center; margin: 28px 0 12px; }
+/* 札の中の文字は、四角の真ん中に寄せる。text-box で行の上下にあるフォントの余白（字の上の空きや、数字にはない下がり部分）を
+   切り落とし、字そのものの高さで上下中央にそろえる。「STEP」は字間の余りが右に付くので、左にも同じだけ足して左右をそろえる */
 .level-head b {
-  grid-row: 1 / 3; display: grid; align-content: center; justify-items: center; gap: 3px;
+  grid-row: 1 / 3; display: grid; align-content: center; justify-items: center; gap: 6px;
   width: 52px; height: 52px; border-radius: 16px; color: var(--on-accent); background: var(--accent); line-height: 1;
 }
-.step-label { font: 800 .6rem var(--en); letter-spacing: .1em; }
-.step-no { font: 800 1.45rem var(--en); font-variant-numeric: tabular-nums; }
+.step-label, .step-no { text-box: trim-both cap alphabetic; }
+.step-label { font: 800 .6rem/1 var(--en); letter-spacing: .1em; padding-left: .1em; }
+.step-no { font: 800 1.45rem/1 var(--en); font-variant-numeric: tabular-nums; }
 .level-head h2 { align-self: end; font-size: 1.15rem; font-weight: 800; line-height: 1.35; }
 .level-head small { align-self: start; color: var(--muted); font-size: .8rem; font-weight: 600; line-height: 1.5; }
 .sets { display: grid; gap: 10px; }
