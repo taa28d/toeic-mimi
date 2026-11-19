@@ -249,11 +249,12 @@ html.bars-themed .tabs { background: var(--bg); -webkit-backdrop-filter: none; b
 .dots i.on { width: 24px; background: var(--accent); }
 
 /* ── ホーム ── */
-/* 1行目に日付とレベル・連続日数、その下にあいさつ。名前は途中で折り返さず、あいさつの次の行に置く */
+/* 1行目に日付とレベル・連続日数、その下にあいさつを横幅いっぱいに1行で。
+   名前は途中で折り返さない（入りきらないときだけ、名前ごと次の行へ） */
 .home-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .date { color: var(--muted); font-size: .85rem; font-weight: 700; }
 .hello { margin-top: 6px; font-size: 1.5rem; line-height: 1.3; font-weight: 800; letter-spacing: .01em; }
-.hello-name { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hello-name { display: inline-block; max-width: 100%; vertical-align: top; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .chips { display: flex; gap: 8px; flex: none; }
 .chip { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px; border-radius: 999px; background: var(--surface); box-shadow: var(--shadow); font-weight: 800; font-size: .9rem; white-space: nowrap; }
 .chip .icon { width: 1.15rem; height: 1.15rem; }
@@ -324,10 +325,11 @@ html.bars-themed .tabs { background: var(--bg); -webkit-backdrop-filter: none; b
 .page-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .page-head h1 { font-size: 1.6rem; font-weight: 800; }
 .page-head p { color: var(--muted); font-size: .88rem; font-weight: 600; }
-.level-head { display: flex; align-items: baseline; gap: 10px; margin: 26px 0 10px; }
-.level-head b { font: 800 .8rem var(--en); color: var(--on-accent); background: var(--accent); padding: 2px 9px; border-radius: 99px; }
-.level-head h2 { font-size: 1.1rem; font-weight: 800; }
-.level-head small { color: var(--muted); font-size: .8rem; font-weight: 600; }
+/* 1行目に「STEP 3」の札と題、説明はその下の行に置く（横に並べると、狭い画面で札と題が折り返す） */
+.level-head { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 10px; margin: 26px 0 10px; }
+.level-head b { flex: none; white-space: nowrap; font: 800 .8rem var(--en); color: var(--on-accent); background: var(--accent); padding: 2px 9px; border-radius: 99px; }
+.level-head h2 { min-width: 0; font-size: 1.1rem; font-weight: 800; }
+.level-head small { flex: 1 0 100%; color: var(--muted); font-size: .8rem; font-weight: 600; line-height: 1.5; }
 .sets { display: grid; gap: 10px; }
 .set { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px 12px; align-items: center; padding: 14px 16px; border-radius: 18px; background: var(--surface); box-shadow: var(--shadow); }
 .set.next { box-shadow: var(--shadow), inset 0 0 0 2.5px var(--sun); }
@@ -593,6 +595,12 @@ html.bars-themed body.no-tabs .navfade {
   display: block; position: fixed; inset: auto 0 0; height: 36px; z-index: 14; pointer-events: none;
   background: linear-gradient(to top, var(--bg), color-mix(in srgb, var(--bg) 0%, transparent));
 }
+/* iPhone（iOS 26）は、ステータスバーの裏に来たページをぼかして見せ、そのぼかしが少し下（日付やレベルの行）までにじむ。
+   上の端に、背景色で塗った横幅いっぱいの帯を置くと、iOS はぼかさずにその色で塗る。
+   帯は最初の表示からあり、タップを受ける（pointer-events: none や透明だと iOS が帯と見なさない）。
+   下の短いぼかしは、スクロールした文字が帯の境目でぶつ切りに見えないようにするもの */
+.topcover { position: fixed; top: 0; left: 0; right: 0; height: var(--sa-top); z-index: 18; background: var(--bg); }
+.topcover::after { content: ""; position: absolute; top: 100%; left: 0; right: 0; height: 10px; pointer-events: none; background: linear-gradient(var(--bg), color-mix(in srgb, var(--bg) 0%, transparent)); }
 #saProbe { position: fixed; top: 0; left: 0; width: 0; visibility: hidden; pointer-events: none; padding: var(--sa-top) 0 var(--sa-bottom); }
 
 /* ── 広い画面：2列 ── */
@@ -930,6 +938,7 @@ html.calm *, html.calm *::before, html.calm *::after { transition-duration: .01s
 
 <div class="fx" id="fx" aria-hidden="true"></div>
 <div class="navfade" aria-hidden="true"></div>
+<div class="topcover" aria-hidden="true"></div>
 <!-- ミミのせりふを読み上げソフトへ1文まとめて伝える（見た目のふきだしは1文字ずつ動くので、読み上げからは外している） -->
 <p class="sr" id="sr-say" aria-live="polite"></p>
 <div class="toast" id="toast" role="status" hidden>

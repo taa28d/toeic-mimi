@@ -8,7 +8,7 @@
   const hasDraw = Boolean(window.DrawSVGPlugin);
   const hasPhysics = Boolean(window.Physics2DPlugin);
   if (window.CustomWiggle) window.CustomWiggle.create('errShake', { wiggles: 3, type: 'easeOut' });
-  const VERSION = '1.4.0';
+  const VERSION = '1.4.1';
   const NS = 'http://www.w3.org/2000/svg';
 
   const LINES = window.MIMI_LINES;
@@ -1093,7 +1093,7 @@
     const today = todayStat();
     $('home-date').textContent = `${now.getMonth() + 1}月${now.getDate()}日（${'日月火水木金土'[now.getDay()]}）`;
     const hello = { morning: 'おはよう', day: 'こんにちは', evening: 'こんばんは', night: 'こんばんは' }[timeSlot()];
-    // 名前があれば「おはよう、」のあとで改行して名前を出す
+    // 名前があれば「おはよう、○○さん」と1行で。名前は途中で折り返さない（CSS の .hello-name）
     const helloEl = $('home-hello');
     if (d.profile.name) helloEl.replaceChildren(`${hello}、`, make('span', 'hello-name', `${d.profile.name}さん`));
     else helloEl.textContent = hello;
