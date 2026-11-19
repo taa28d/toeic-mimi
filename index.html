@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <!-- 読み込めるのはこのサイトのファイルだけ。外のスクリプトや通信を使わないので、万一の差し込みを防ぐ -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self'; connect-src 'self'; font-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
-<title>ミミとTOEIC</title>
+<title>Mimi's TOEIC</title>
 <meta name="description" content="キャラクターのミミといっしょに、TOEIC 600点から750点を目指す単語と文法（Part 5）の練習アプリです。オフラインでも使えます。">
 <meta property="og:type" content="website">
-<meta property="og:title" content="ミミとTOEIC">
+<meta property="og:title" content="Mimi's TOEIC">
 <meta property="og:description" content="キャラクターのミミといっしょに、TOEIC 600→750点を目指す単語と文法（Part 5）の練習アプリ。">
 <meta property="og:url" content="https://taa28d.github.io/toeic-mimi/">
 <meta property="og:image" content="https://taa28d.github.io/toeic-mimi/icons/og-image.png">
@@ -17,7 +17,7 @@
 <meta name="theme-color" content="#f6f1e7">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="ミミとTOEIC">
+<meta name="apple-mobile-web-app-title" content="Mimi's TOEIC">
 <!-- black-translucent（ステータスバーの裏まで描く）は、iOS 26 のホーム画面アプリで下が空くので使わない -->
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="manifest" href="manifest.webmanifest">
@@ -875,6 +875,7 @@ html.calm *, html.calm *::before, html.calm *::after { transition-duration: .01s
         <div class="setting"><div class="setting-row">1日の目標</div><div class="seg" data-set="daily"><button type="button" data-v="10">10問</button><button type="button" data-v="20">20問</button><button type="button" data-v="30">30問</button></div></div>
         <div class="setting"><div class="setting-row">文法の1問の時間</div><div class="seg" data-set="timer"><button type="button" data-v="10">10秒</button><button type="button" data-v="15">15秒</button><button type="button" data-v="20">20秒</button><button type="button" data-v="30">30秒</button><button type="button" data-v="0">なし</button></div></div>
         <div class="setting"><div class="setting-row"><span>効果音<small>正解・不正解・残り時間の音</small></span><button class="switch" type="button" role="switch" data-toggle="sound" aria-label="効果音"></button></div><button class="link sound-try" id="sound-try" type="button">レベルアップの音を聞いてみる</button></div>
+        <div class="setting"><div class="setting-row"><span>BGM<small>英語の読み上げ中は小さくなります。曲：「高架下と赤提灯」H★（OpenTracks）</small></span><button class="switch" type="button" role="switch" data-toggle="music" aria-label="BGM"></button></div></div>
         <div class="setting"><div class="setting-row"><span>ミミの声<small>話すときの小さな音</small></span><button class="switch" type="button" role="switch" data-toggle="voice" aria-label="ミミの声"></button></div></div>
         <div class="setting"><div class="setting-row"><span>単語を自動で読み上げる<small>問題やカードに単語が出たときに発音する</small></span><button class="switch" type="button" role="switch" data-toggle="speak" aria-label="単語を自動で読み上げる"></button></div></div>
         <div class="setting"><div class="setting-row"><span>答えたあと例文を読み上げる<small>文法は正解を入れた文、単語は単語と例文を発音する</small></span><button class="switch" type="button" role="switch" data-toggle="speakAfter" aria-label="答えたあと例文を読み上げる"></button></div></div>
@@ -909,7 +910,7 @@ html.calm *, html.calm *::before, html.calm *::after { transition-duration: .01s
       </div>
     </section>
     <section class="card about rise">
-      <p>ミミとTOEIC。問題と例文はこのアプリのために書いたものです。動きは GSAP（gsap.com、無料の Standard License）で作っています。</p>
+      <p>Mimi's TOEIC（ミミとTOEIC）。問題と例文はこのアプリのために書いたものです。BGM は OpenTracks の「高架下と赤提灯」（作曲：H★）を使っています。動きは GSAP（gsap.com、無料の Standard License）で作っています。</p>
       <p><a href="privacy.html">プライバシーポリシー</a></p>
       <p>TOEIC is a registered trademark of ETS. This product is not endorsed or approved by ETS.</p>
       <p id="about-version"></p>

@@ -2,7 +2,7 @@
 // 版（CACHE）ごとに全部のファイルをまとめて保存し、その版のファイルだけを返す（古い版と新しい版が混ざらない）。
 // sw.js が変わるとブラウザが新しい版を取りに来て、届いたらすぐ切り替える。画面には「新しい版になりました」と出る。
 // ファイルを直したら CACHE の番号を上げる。
-const CACHE = 'toeic-mimi-v8';
+const CACHE = 'toeic-mimi-v9';
 const FILES = [
   './',
   './index.html',
@@ -24,6 +24,7 @@ const FILES = [
   './icons/icon-maskable-512.png',
   './icons/icon-monochrome-512.png',
   './icons/apple-touch-icon.png',
+  './audio/bgm.dat',
 ];
 
 self.addEventListener('install', event => {

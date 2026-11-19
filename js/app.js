@@ -1,4 +1,4 @@
-/* ミミとTOEIC：画面と学習の流れ */
+/* Mimi's TOEIC：画面と学習の流れ */
 (() => {
   'use strict';
 
@@ -8,7 +8,7 @@
   const hasDraw = Boolean(window.DrawSVGPlugin);
   const hasPhysics = Boolean(window.Physics2DPlugin);
   if (window.CustomWiggle) window.CustomWiggle.create('errShake', { wiggles: 3, type: 'easeOut' });
-  const VERSION = '1.2.0';
+  const VERSION = '1.3.0';
   const NS = 'http://www.w3.org/2000/svg';
 
   const LINES = window.MIMI_LINES;
@@ -60,7 +60,7 @@
     const fresh = () => ({
       v: 1, onboarded: false, lastVisit: null,
       profile: { name: '', now: '', goal: 750, daily: 20 },
-      settings: { timer: 20, sound: true, voice: true, speak: true, speakAfter: true, motion: 'auto' },
+      settings: { timer: 20, sound: true, music: true, voice: true, speak: true, speakAfter: true, motion: 'auto' },
       xp: 0, streak: { last: null, count: 0, best: 0 },
       days: {}, words: {}, gram: {}, history: [], seenLesson: {},
     });
@@ -135,17 +135,26 @@
     const synth = nativeTTS ? null : window.speechSynthesis || null;
     let voice = null;
     let primed = false;
+    // 端末にある英語の声から、いちばん人に近いものを選ぶ。点数の高い順：
+    // iPhone・Mac の「プレミアム」「拡張」、Windows の「Natural」、ネットにつながっていれば Edge の Online や Google の声。
+    // 遊び用の声（Albert、Bells など）や、古い機械的な声は選ばない
+    const ODD = /Albert|Bad News|Bahh|Bells|Boing|Bubbles|Cellos|Deranged|Good News|Hysterical|Jester|Junior|Organ|Pipe Organ|Superstar|Trinoids|Whisper|Wobble|Zarvox|Fred|Ralph|Kathy|Princess|Grandma|Grandpa|Eddy|Flo|Reed|Rocko|Sandy|Shelley|eSpeak/i;
+    function score(v) {
+      if (!v.localService && !navigator.onLine) return -2; // ネットの声は、つながっていないと読めない
+      if (ODD.test(v.name)) return -1;
+      let s = /^en[-_]US/i.test(v.lang) ? 20 : /^en[-_](GB|CA|AU|IE|NZ)/i.test(v.lang) ? 10 : 0;
+      if (/premium|enhanced|natural|neural|プレミアム|拡張/i.test(v.name)) s += 100;
+      if (!v.localService) s += 60; // ネットの声（Edge の Online、Chrome の Google）は自然
+      if (/Ava|Samantha|Allison|Susan|Zoe|Evan|Nathan|Tom|Joelle|Noelle|Jenny|Aria|Emma|Michelle|Andrew|Brian|Guy|Christopher|Google/i.test(v.name)) s += 15;
+      return s;
+    }
     function choose() {
       if (!synth) return;
       const english = synth.getVoices().filter(v => /^en[-_]/i.test(v.lang));
-      const liked = [/Samantha/i, /Ava/i, /Google US English/i, /Jenny/i, /Aria/i, /Natural/i];
-      voice = null;
-      for (const re of liked) {
-        voice = english.find(v => re.test(v.name) && /US/i.test(v.lang)) || english.find(v => re.test(v.name));
-        if (voice) break;
-      }
-      if (!voice) voice = english.find(v => /en[-_]US/i.test(v.lang)) || english[0] || null;
+      voice = english.reduce((best, v) => (score(v) > (best ? score(best) : -Infinity) ? v : best), null);
     }
+    window.addEventListener('online', choose);
+    window.addEventListener('offline', choose);
     // iPhone は押した瞬間に一度使っておくと、あとからの読み上げも許される
     function prime() {
       if (!synth || primed) return;
@@ -156,8 +165,13 @@
     }
     let token = 0; // 読み上げを始めるたび・止めるたびに増やす。遅らせた読み上げや続きの文を取り消す目印
     let nativeBusy = false;
+    // 読み始め・読み終わりを知らせる先（BGM を小さくするため）。読み終わりの知らせが来ない端末に備えて、
+    // 長くてもかかりそうな秒数も渡す
+    let onTalk = () => {};
+    const longest = (text, rate) => 2 + text.length * .085 / rate;
     function stop() {
       token++;
+      onTalk(false);
       if (nativeTTS) { if (nativeBusy) nativeTTS.stop().catch(() => {}); nativeBusy = false; return; }
       if (synth && (synth.speaking || synth.pending)) synth.cancel();
     }
@@ -169,9 +183,10 @@
       const go = () => {
         if (mine !== token) { if (onEnd) onEnd({ error: 'canceled' }); return; }
         nativeBusy = true;
+        onTalk(true, longest(text, rate));
         nativeTTS.speak({ text, lang: 'en-US', rate, pitch: 1, volume: 1, category: 'ambient' })
-          .then(() => { if (mine === token) nativeBusy = false; if (onEnd) onEnd(mine === token ? {} : { error: 'canceled' }); })
-          .catch(() => { if (mine === token) nativeBusy = false; if (onEnd) onEnd({ error: 'failed' }); });
+          .then(() => { if (mine === token) { nativeBusy = false; onTalk(false); } if (onEnd) onEnd(mine === token ? {} : { error: 'canceled' }); })
+          .catch(() => { if (mine === token) { nativeBusy = false; onTalk(false); } if (onEnd) onEnd({ error: 'failed' }); });
       };
       if (busy) setTimeout(go, 150);
       else go();
@@ -192,7 +207,11 @@
         u.lang = 'en-US';
         u.rate = rate;
         if (voice) u.voice = voice;
-        if (onEnd) { u.onend = onEnd; u.onerror = onEnd; }
+        u.onend = u.onerror = e => {
+          if (mine === token) onTalk(false);
+          if (onEnd) onEnd(e);
+        };
+        onTalk(true, longest(text, rate));
         synth.speak(u);
       };
       if (busy) setTimeout(go, 150);
@@ -223,8 +242,24 @@
       choose();
       if (synth.addEventListener) synth.addEventListener('voiceschanged', choose);
     }
-    return { speak, speakList, stop, prime, supported: Boolean(synth || nativeTTS) };
+    return { speak, speakList, stop, prime, onTalk: fn => { onTalk = fn; }, supported: Boolean(synth || nativeTTS) };
   })();
+
+  // 少しあとに読み上げる予約。予約は1つだけで、新しく予約するか、次の問題・次のカード・別の画面へ移ると取り消す
+  // （前の問題の文が、次の問題が出たあとに読まれ始めないように）
+  let speakCall = null;
+  function speakLater(delay, fn) {
+    cancelSpeakLater();
+    speakCall = gsap.delayedCall(delay, () => { speakCall = null; fn(); });
+  }
+  function cancelSpeakLater() {
+    if (speakCall) { speakCall.kill(); speakCall = null; }
+  }
+  function hush() {
+    cancelSpeakLater();
+    speech.stop();
+  }
+  document.addEventListener('visibilitychange', () => { if (document.hidden) hush(); });
 
   /* ━━ 5. 効果音（Web Audio API でその場で合成。音声ファイルは使わない） ━━ */
   const sound = (() => {
@@ -386,6 +421,133 @@
     }
     return { play, ready, draw };
   })();
+
+  /* ━━ 5b. BGM：OpenTracks の「高架下と赤提灯」（作曲 H★） ━━
+     曲のファイルは、そのままでは音声として開けない形（audio/bgm.dat。バイトを鍵で混ぜてある）で置き、読み込むときに戻す。
+     OpenTracks のライセンスで「利用者が音源ファイルに音声ファイルとして容易にアクセス・複製できる状態」が禁止されているため。
+     英語が聞き取りやすいよう、①音量は読み上げよりずっと小さく ②読み上げのあいだはさらに下げ
+     ③声と重なりやすい高さ（2.5kHz あたり）を少し削る */
+  const bgm = (() => {
+    const FILE = 'audio/bgm.dat';
+    const KEY = [0x4d, 0x69, 0x6d, 0x69, 0x27, 0x73, 0x20, 0x54, 0x4f, 0x45, 0x49, 0x43, 0x20, 0x42, 0x47, 0x4d]; // "Mimi's TOEIC BGM"
+    const TARGET = .022; // 曲の大きさ（RMS）をこの値にそろえる。読み上げの声よりずっと小さい（約 -33dBFS）
+    const DUCK = .3;     // 読み上げのあいだは、ふだんのこの割合まで下げる（約 -10dB）
+    let buffer = null;
+    let loading = null;
+    let graph = null;    // { ctx, eq, master }
+    let src = null;
+    let startedAt = 0;   // 曲のどこから鳴らしているか（止めたところから続ける）
+    let offset = 0;
+    let starting = false; // 読み込み中に二重に鳴らし始めないように
+    let ducked = false;
+    let duckTimer = 0;
+    let safety = 0;
+    const on = () => store.data.settings.music !== false;
+
+    const decode = (a, data) => new Promise((ok, ng) => {
+      const p = a.decodeAudioData(data, ok, ng); // 古い Safari は Promise を返さない
+      if (p && p.then) p.then(ok, ng);
+    });
+    // 曲を読み込んで戻す。前後の無音（MP3 の詰め物）は、つなぎ目で途切れないよう飛ばす
+    function load(a) {
+      if (!loading) {
+        loading = fetch(FILE).then(r => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); }).then(raw => {
+          const bytes = new Uint8Array(raw);
+          for (let i = 0; i < bytes.length; i++) bytes[i] ^= KEY[i % KEY.length];
+          return decode(a, bytes.buffer);
+        }).then(buf => {
+          const ch = [...Array(buf.numberOfChannels).keys()].map(c => buf.getChannelData(c));
+          const loud = i => ch.some(d => Math.abs(d[i]) > 1e-4);
+          let head = 0;
+          let tail = buf.length - 1;
+          while (head < tail && !loud(head)) head++;
+          while (tail > head && !loud(tail)) tail--;
+          let sum = 0;
+          let n = 0;
+          for (const d of ch) for (let i = head; i <= tail; i += 4) { sum += d[i] * d[i]; n++; }
+          const rms = Math.sqrt(sum / Math.max(n, 1)) || .1;
+          buffer = { buf, from: head / buf.sampleRate, to: (tail + 1) / buf.sampleRate, gain: Math.min(1, TARGET / rms) };
+          return buffer;
+        }).catch(error => { loading = null; throw error; });
+      }
+      return loading;
+    }
+    function build(a) {
+      if (graph && graph.ctx === a) return graph;
+      const eq = a.createBiquadFilter();
+      eq.type = 'peaking';
+      eq.frequency.value = 2500;
+      eq.Q.value = .7;
+      eq.gain.value = -6;
+      const master = a.createGain();
+      master.gain.value = 0;
+      eq.connect(master).connect(a.destination);
+      graph = { ctx: a, eq, master };
+      return graph;
+    }
+    // 音量を target へなめらかに動かす
+    function fade(target, sec) {
+      if (!graph) return;
+      const g = graph.master.gain;
+      const now = graph.ctx.currentTime;
+      g.cancelScheduledValues(now);
+      g.setValueAtTime(g.value, now);
+      g.linearRampToValueAtTime(target, now + sec);
+    }
+    const volume = () => (buffer ? buffer.gain : 0) * (ducked ? DUCK : 1);
+
+    // 鳴らし始める（画面を押したあと・設定でオンにしたとき・画面に戻ったとき）。もう鳴っていれば何もしない
+    function start() {
+      if (!on() || document.hidden || src || starting) return;
+      const a = sound.ready();
+      if (!a) return;
+      starting = true;
+      load(a).then(({ buf, from, to }) => {
+        starting = false;
+        if (!on() || document.hidden || src) return;
+        build(a);
+        const s = a.createBufferSource();
+        s.buffer = buf;
+        s.loop = true;
+        s.loopStart = from;
+        s.loopEnd = to;
+        s.connect(graph.eq);
+        const at = from + (offset % (to - from));
+        s.start(0, at);
+        src = s;
+        startedAt = a.currentTime - (at - from);
+        fade(volume(), 2.5);
+      }).catch(() => { starting = false; /* 読めなくても勉強は続ける。次に画面を押したときにまた試す */ });
+    }
+    function stop(sec = .6) {
+      if (!src || !graph) return;
+      const s = src;
+      const a = graph.ctx;
+      src = null;
+      if (buffer) offset = (a.currentTime - startedAt) % (buffer.to - buffer.from);
+      fade(0, sec);
+      try { s.stop(a.currentTime + sec + .05); } catch { /* もう止まっている */ }
+    }
+    // 読み上げのあいだは小さくする。読み終わってすぐ戻すと、単語と例文のあいだで上下するので少し待つ
+    function duck(talking, longestSec = 8) {
+      clearTimeout(duckTimer);
+      clearTimeout(safety);
+      const set = value => {
+        if (ducked === value) return;
+        ducked = value;
+        if (src) fade(volume(), value ? .2 : .9);
+      };
+      if (talking) {
+        set(true);
+        safety = setTimeout(() => set(false), longestSec * 1000); // 読み終わりの知らせが来なかったとき
+      } else duckTimer = setTimeout(() => set(false), 700);
+    }
+    speech.onTalk(duck);
+    const hide = () => stop(.3);
+    document.addEventListener('visibilitychange', () => (document.hidden ? hide() : start()));
+    window.addEventListener('pagehide', hide);
+    return { start, stop, status: () => ({ playing: Boolean(src), ducked, level: graph ? graph.master.gain.value : 0, buffer }) };
+  })();
   // Android だけ短く震わせる。画面に触れる前は、ブラウザが振動を許さない
   const buzz = pattern => {
     if (!store.data.settings.sound || !navigator.vibrate) return;
@@ -506,11 +668,16 @@
   let current = null;
   const bubble = () => (current ? screens[current].querySelector('.bubble') : null);
   const srSay = $('sr-say');
+  let talkUntil = 0; // ミミの声（ピピッ）が鳴り終わる時刻
   function say(text, vars) {
     const line = fmt(text, vars);
     srSay.textContent = line; // 読み上げソフトには1文まとめて伝える
-    return mimi.say(bubble(), line, { blip: i => sound.play('blip', i) });
+    const tl = mimi.say(bubble(), line, { blip: i => sound.play('blip', i) });
+    talkUntil = tl && tl.talkEnd && store.data.settings.voice ? performance.now() + tl.talkEnd * 1000 : 0;
+    return tl;
   }
+  // 英語の読み上げを始めるまでの秒数。ミミの声と重なると聞き取りにくいので、鳴り終わってから読む
+  const afterTalk = base => Math.max(base, (talkUntil - performance.now()) / 1000 + .15);
   function fmt(line, vars = {}) {
     const name = store.data.profile.name.trim();
     return line.replace(/\{name\}、?/g, name ? `${name}さん、` : '').replace(/\{(\w+)\}/g, (_, key) => vars[key] ?? '');
@@ -581,7 +748,7 @@
       tabButtons.forEach(t => (t.dataset.go === name ? t.setAttribute('aria-current', 'page') : t.removeAttribute('aria-current')));
       placePill(name, !wasHidden);
     }
-    if (!same) window.scrollTo(0, 0);
+    if (!same) { window.scrollTo(0, 0); hush(); }
     const spot = next.querySelector('.mimi-spot');
     const moved = spot && mimi.el.parentNode !== spot;
     if (moved) spot.append(mimi.el);
@@ -737,6 +904,8 @@
 
   // 最初に触れたときに、音と読み上げを使える状態にする（iPhone の決まり）
   document.addEventListener('pointerdown', () => { sound.ready(); speech.prime(); }, { once: true, capture: true });
+  // BGM も画面を押してから鳴らす（ブラウザは押す前に音を出させない）。止まっていたら、押すたびにまた試す
+  document.addEventListener('pointerdown', () => bgm.start(), { capture: true });
 
   /* ━━ 11. はじめての案内 ━━ */
   let welcomeStep = 0;
@@ -987,7 +1156,7 @@
   }
   function stopRound() {
     stopTimer();
-    speech.stop();
+    hush();
     mimi.lockGaze(null);
     mimi.hurry(false);
   }
@@ -1001,6 +1170,7 @@
     return btn;
   }
   function speakWith(btn, text, rate) {
+    cancelSpeakLater(); // 自分で押したときは、予約していた読み上げより優先する
     if (btn) btn.classList.add('on');
     const ok = speech.speak(text, { rate, onEnd: () => { if (btn) btn.classList.remove('on'); } });
     if (!ok) {
@@ -1134,7 +1304,7 @@
     if (q.timed) startTimer(round.seconds);
     else $('timer').hidden = true;
     if (store.data.settings.speak && ['meaning', 'intro', 'listen'].includes(q.kind)) {
-      gsap.delayedCall(.35, () => { if (round && round.q === q) speakWith(quizEls.card.querySelector('.say-btn'), q.word.en, .85); });
+      speakLater(afterTalk(.35), () => { if (round && round.q === q && !round.answered) speakWith(quizEls.card.querySelector('.say-btn'), q.word.en, .85); });
     }
     if (q.kind === 'intro') showFoot('覚えた！', { rise: false });
   }
@@ -1211,6 +1381,7 @@
     round.answered = true;
     const elapsed = q.timed ? round.seconds - timer.left : (performance.now() - round.shownAt) / 1000;
     stopTimer();
+    cancelSpeakLater(); // 問題の単語をまだ読んでいなければ、もう読まない
     mimi.lockGaze(null);
     const buttons = [...quizEls.choices.children];
     const rightIndex = q.choices.findIndex(c => c.right);
@@ -1286,8 +1457,8 @@
   // 文法は空欄に正解を入れた文。単語は「単語 → 例文」の順（解説の🔊ボタンも、読んでいるほうが動く）
   function readAfterAnswer(q, rightText) {
     if (!store.data.settings.speakAfter || !speech.supported) return;
-    gsap.delayedCall(.75, () => {
-      if (!round || round.q !== q || current !== 'quiz') return; // もう次の問題へ進んだ
+    speakLater(afterTalk(.75), () => {
+      if (!round || round.q !== q || round.busy || current !== 'quiz') return; // もう次の問題へ進んだ
       const buttons = quizEls.explain.querySelectorAll('.say-btn');
       if (q.kind === 'grammar') {
         speech.speakList([{ text: q.g.q.replace('-------', rightText), rate: .9, btn: buttons[0] }]);
@@ -1378,7 +1549,7 @@
       mimi.hop(10);
       setBar($('quiz-bar'), (round.i + 1) / round.items.length, .5);
     } else if (q && !round.answered) return;
-    speech.stop();
+    hush();
     nextQuestion();
   });
   // やめる（×ボタンと Android の戻るボタン）。1問も答えていなければ、そのままホームへ
@@ -1665,7 +1836,7 @@
     deck.card = card;
     bindDrag(card);
     if (!calm()) gsap.fromTo(card, { y: 26, scale: .93, opacity: 0 }, { y: 0, scale: 1, opacity: 1, duration: .45, ease: 'back.out(1.5)' });
-    if (store.data.settings.speak) gsap.delayedCall(.3, () => { if (deck && deck.card === card) speech.speak(w.en, { rate: .85 }); });
+    if (store.data.settings.speak) speakLater(afterTalk(.3), () => { if (deck && deck.card === card) speech.speak(w.en, { rate: .85 }); });
   }
   function flipCard() {
     if (!deck || !deck.card || deck.busy) return;
@@ -1716,7 +1887,7 @@
     deck.busy = true;
     const card = deck.card;
     const w = deck.words[deck.i];
-    speech.stop();
+    hush();
     sound.play('whoosh');
     markCard(w, dir > 0);
     if (dir > 0) { mimi.hop(10); mimi.setMood('joy', { after: .8, then: 'smile' }); } else mimi.setMood('gentle', { after: 1, then: 'smile' });
@@ -1758,7 +1929,7 @@
   }
   $('card-know').addEventListener('click', () => swipe(1));
   $('card-again').addEventListener('click', () => swipe(-1));
-  $('card-say').addEventListener('click', () => { if (deck && deck.words[deck.i]) speech.speak(deck.words[deck.i].en, { rate: .85 }); });
+  $('card-say').addEventListener('click', () => { if (deck && deck.words[deck.i]) { cancelSpeakLater(); speech.speak(deck.words[deck.i].en, { rate: .85 }); } });
   $('cards-close').addEventListener('click', openWords);
   $('done-test').addEventListener('click', () => startSetTest(deck.set.index));
   $('done-again-btn').addEventListener('click', () => startCards(deck.set.index, deck.again));
@@ -1998,6 +2169,7 @@
     store.save();
     sw.setAttribute('aria-checked', String(store.data.settings[key]));
     if (key === 'voice' && store.data.settings.voice) say('この声、聞こえる？');
+    if (key === 'music') { if (store.data.settings.music) bgm.start(); else bgm.stop(); }
   }));
   $('sound-try').addEventListener('click', () => sound.play('levelUp', null, { force: true }));
   function applyMotion() {

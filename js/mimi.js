@@ -447,6 +447,8 @@
       if (blip) {
         const count = Math.min(visible.length, 16);
         for (let i = 0; i < count; i += 2) tl.call(blip, [i], .08 + i * step);
+        // 声（ピピッという音）が鳴り終わる時刻。英語の読み上げは、このあとに始める
+        if (count) tl.talkEnd = .08 + (count - 1 - ((count - 1) % 2)) * step + .06;
       }
       return tl;
     }
