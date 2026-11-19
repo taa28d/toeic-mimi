@@ -8,7 +8,7 @@
   const hasDraw = Boolean(window.DrawSVGPlugin);
   const hasPhysics = Boolean(window.Physics2DPlugin);
   if (window.CustomWiggle) window.CustomWiggle.create('errShake', { wiggles: 3, type: 'easeOut' });
-  const VERSION = '1.3.0';
+  const VERSION = '1.4.0';
   const NS = 'http://www.w3.org/2000/svg';
 
   const LINES = window.MIMI_LINES;
@@ -126,11 +126,39 @@
   }
   matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', syncThemeColor);
 
-  /* ━━ 4. 英語の読み上げ（Web Speech API） ━━
-     ストア版（Capacitor で包んだアプリ）では、Android の WebView に Web Speech API がないので、
-     端末の読み上げ機能（@capacitor-community/text-to-speech）を使う。どちらでも同じ呼び方で使える */
+  /* ━━ 4. 英語の読み上げ ━━
+     単語・例文・文法の文は、前もって自然な声で作った音声（voice/ の MP3。Kokoro の af_heart）を鳴らす。
+     どの端末でも同じ声で、通信がなくても鳴る。音声がない文や、読めなかったときだけ端末の読み上げ機能を使う：
+     ブラウザでは Web Speech API、ストア版（Capacitor）では Android の WebView にそれがないので
+     @capacitor-community/text-to-speech。どれも同じ呼び方で使える */
   const isNative = Boolean(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
   const nativeTTS = isNative && window.Capacitor.Plugins ? window.Capacitor.Plugins.TextToSpeech || null : null;
+  // 文から音声ファイルの名前（8桁）を作る。toeic-mimi-store/voice/studio.html と同じ計算
+  const voiceKey = text => {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+    return (h >>> 0).toString(16).padStart(8, '0');
+  };
+  const VOICE_FILES = new Set(window.TOEIC_VOICE ? window.TOEIC_VOICE.files : []);
+  const decodeAudio = (a, data) => new Promise((ok, ng) => {
+    const p = a.decodeAudioData(data, ok, ng); // 古い Safari は Promise を返さない
+    if (p && p.then) p.then(ok, ng);
+  });
+  const clips = (() => {
+    const cache = new Map(); // 名前 → 音（Promise）。最近の40個だけ持つ
+    const has = text => VOICE_FILES.has(voiceKey(text));
+    function load(a, text) {
+      const key = voiceKey(text);
+      let p = cache.get(key);
+      if (p) { cache.delete(key); cache.set(key, p); return p; }
+      p = fetch(`voice/${key}.mp3`).then(r => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); }).then(b => decodeAudio(a, b));
+      p.catch(() => cache.delete(key));
+      cache.set(key, p);
+      if (cache.size > 40) cache.delete(cache.keys().next().value);
+      return p;
+    }
+    return { has, load };
+  })();
   const speech = (() => {
     const synth = nativeTTS ? null : window.speechSynthesis || null;
     let voice = null;
@@ -169,11 +197,38 @@
     // 長くてもかかりそうな秒数も渡す
     let onTalk = () => {};
     const longest = (text, rate) => 2 + text.length * .085 / rate;
+    let playing = null; // いま鳴っている音声ファイル
     function stop() {
       token++;
       onTalk(false);
+      if (playing) { try { playing.stop(); } catch { /* もう止まっている */ } playing = null; }
       if (nativeTTS) { if (nativeBusy) nativeTTS.stop().catch(() => {}); nativeBusy = false; return; }
       if (synth && (synth.speaking || synth.pending)) synth.cancel();
+    }
+    // 前もって作った音声で読む。読み込めなかったときは端末の読み上げ機能で読む
+    function speakClip(text, rate, onEnd) {
+      stop();
+      const mine = token;
+      const a = sound.ready();
+      if (!a) return speakDevice(text, rate, onEnd);
+      clips.load(a, text).then(buf => {
+        if (mine !== token) { if (onEnd) onEnd({ error: 'canceled' }); return; }
+        const src = a.createBufferSource();
+        src.buffer = buf;
+        src.connect(a.destination);
+        src.onended = () => {
+          if (playing === src) playing = null;
+          if (mine === token) onTalk(false);
+          if (onEnd) onEnd(mine === token ? {} : { error: 'canceled' });
+        };
+        playing = src;
+        onTalk(true, buf.duration + 2);
+        src.start();
+      }).catch(() => {
+        if (mine !== token) { if (onEnd) onEnd({ error: 'canceled' }); return; }
+        if (!speakDevice(text, rate, onEnd) && onEnd) onEnd({ error: 'failed' });
+      });
+      return true;
     }
     // 端末の読み上げ機能で読む（ストア版）。読み終わると Promise が解ける
     function speakNative(text, rate, onEnd) {
@@ -192,9 +247,14 @@
       else go();
       return true;
     }
+    function speak(text, { rate = .92, onEnd } = {}) {
+      if (clips.has(text)) return speakClip(text, rate, onEnd);
+      return speakDevice(text, rate, onEnd);
+    }
+    // 端末の読み上げ機能で読む。
     // iPhone の Safari は、読んでいる途中を止めた直後に次を読ませると、黙って読み飛ばすことがある。
     // 止めたときは少し待ってから読む
-    function speak(text, { rate = .92, onEnd } = {}) {
+    function speakDevice(text, rate, onEnd) {
       if (nativeTTS) return speakNative(text, rate, onEnd);
       if (!synth) { if (onEnd) onEnd(); return false; }
       const busy = synth.speaking || synth.pending;
@@ -221,7 +281,7 @@
     // いくつかの文を順に読む（単語 → 例文）。ボタンは読んでいるあいだ動かす。
     // 途中でほかの読み上げが始まったり止めたりしたら、残りは読まない
     function speakList(items) {
-      if ((!synth && !nativeTTS) || !items.length) return false;
+      if ((!synth && !nativeTTS && !VOICE_FILES.size) || !items.length) return false;
       const next = i => {
         const item = items[i];
         if (item.btn) item.btn.classList.add('on');
@@ -242,7 +302,7 @@
       choose();
       if (synth.addEventListener) synth.addEventListener('voiceschanged', choose);
     }
-    return { speak, speakList, stop, prime, onTalk: fn => { onTalk = fn; }, supported: Boolean(synth || nativeTTS) };
+    return { speak, speakList, stop, prime, onTalk: fn => { onTalk = fn; }, supported: Boolean(synth || nativeTTS || VOICE_FILES.size) };
   })();
 
   // 少しあとに読み上げる予約。予約は1つだけで、新しく予約するか、次の問題・次のカード・別の画面へ移ると取り消す
@@ -444,17 +504,13 @@
     let safety = 0;
     const on = () => store.data.settings.music !== false;
 
-    const decode = (a, data) => new Promise((ok, ng) => {
-      const p = a.decodeAudioData(data, ok, ng); // 古い Safari は Promise を返さない
-      if (p && p.then) p.then(ok, ng);
-    });
     // 曲を読み込んで戻す。前後の無音（MP3 の詰め物）は、つなぎ目で途切れないよう飛ばす
     function load(a) {
       if (!loading) {
         loading = fetch(FILE).then(r => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); }).then(raw => {
           const bytes = new Uint8Array(raw);
           for (let i = 0; i < bytes.length; i++) bytes[i] ^= KEY[i % KEY.length];
-          return decode(a, bytes.buffer);
+          return decodeAudio(a, bytes.buffer);
         }).then(buf => {
           const ch = [...Array(buf.numberOfChannels).keys()].map(c => buf.getChannelData(c));
           const loud = i => ch.some(d => Math.abs(d[i]) > 1e-4);
@@ -2342,8 +2398,22 @@
       navigator.serviceWorker.register('sw.js').then(reg => {
         // アプリを開いたまま何日も使う人のために、画面に戻ってきたときにも新しい版を確かめる
         document.addEventListener('visibilitychange', () => { if (!document.hidden) reg.update().catch(() => {}); });
+        setTimeout(saveVoices, 8000);
       }).catch(() => { /* 使えなくても普通のページとして動く */ });
     });
+  }
+  // 英語の音声（約770個・約8MB）を、通信のあるときに1つずつ端末に保存しておく（通信がなくても鳴るように）。
+  // データを節約する設定の端末では、鳴らしたものだけが保存される（sw.js）
+  function saveVoices() {
+    if (!window.caches || !VOICE_FILES.size || (navigator.connection && navigator.connection.saveData)) return;
+    caches.open('toeic-mimi-voice-1').then(async cache => { // sw.js の VOICE_CACHE と同じ名前
+      const have = new Set((await cache.keys()).map(r => r.url.slice(-12, -4)));
+      for (const key of VOICE_FILES) {
+        if (have.has(key)) continue;
+        if (!navigator.onLine || document.hidden) return; // 次に開いたときに続きから
+        try { await cache.add(`voice/${key}.mp3`); } catch { return; }
+      }
+    }).catch(() => {});
   }
   // 記録が端末の空き容量の整理で消されにくくなるよう、残しておきたいことをブラウザに伝える
   if (navigator.storage && navigator.storage.persist) {
