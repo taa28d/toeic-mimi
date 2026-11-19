@@ -8,7 +8,7 @@
   const hasDraw = Boolean(window.DrawSVGPlugin);
   const hasPhysics = Boolean(window.Physics2DPlugin);
   if (window.CustomWiggle) window.CustomWiggle.create('errShake', { wiggles: 3, type: 'easeOut' });
-  const VERSION = '1.6.0';
+  const VERSION = '1.6.1';
   const NS = 'http://www.w3.org/2000/svg';
 
   const LINES = window.MIMI_LINES;
@@ -2692,20 +2692,61 @@
     mimi.startIdle();
   }
 
-  // 引き継ぎコード：記録を文字にして、別の端末やホーム画面アプリへ移す
+  /* 引き継ぎコード：記録を文字にして、別の端末やホーム画面アプリへ移す。
+     形は「MIMI2:本文の文字数:本文」。本文は記録（JSON）を圧縮して base64 にしたもの。文字数を入れておくので、
+     コピーや貼り付けで途中が切れたら、そうとわかる。圧縮（CompressionStream）が使えない端末では前の形「MIMI1:本文」。
+     どちらの形も読める。コードは長いので、ファイルに保存（iPhone は共有シート、ほかはダウンロード）もできる */
   let transferMode = null;
-  const encode = obj => `MIMI1:${btoa(unescape(encodeURIComponent(JSON.stringify(obj))))}`;
-  const decode = text => {
-    const body = text.trim().replace(/^MIMI1:/, '');
-    return JSON.parse(decodeURIComponent(escape(atob(body))));
+  const b64FromBytes = bytes => {
+    let s = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    return btoa(s);
   };
-  $('export-btn').addEventListener('click', () => {
+  const bytesFromB64 = b64 => Uint8Array.from(atob(b64), ch => ch.charCodeAt(0));
+  const pipe = async (bytes, stream) => new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(stream)).arrayBuffer());
+  async function encode(obj) {
+    const json = new TextEncoder().encode(JSON.stringify(obj));
+    if (window.CompressionStream) {
+      try {
+        const body = b64FromBytes(await pipe(json, new CompressionStream('deflate-raw')));
+        return `MIMI2:${body.length}:${body}`;
+      } catch { /* 圧縮できなければ前の形で */ }
+    }
+    return `MIMI1:${b64FromBytes(json)}`;
+  }
+  // 読めないときは、どこが悪いかがわかる文を投げる
+  async function decode(raw) {
+    const text = String(raw).replace(/\s+/g, '');
+    if (!text) throw new Error('引き継ぎコードを貼り付けてください。');
+    let m = text.match(/^MIMI2:(\d+):([A-Za-z0-9+/=]*)/);
+    if (m) {
+      const len = Number(m[1]);
+      const body = m[2];
+      if (body.length < len) throw new Error(`コードが途中で切れています（${len.toLocaleString()}文字のうち${body.length.toLocaleString()}文字しかありません）。最後までコピーしてください。`);
+      if (!window.DecompressionStream) throw new Error('この端末のブラウザでは、このコードを読めません。iOS や Chrome を新しくしてください。');
+      try {
+        return JSON.parse(new TextDecoder().decode(await pipe(bytesFromB64(body.slice(0, len)), new DecompressionStream('deflate-raw'))));
+      } catch { throw new Error('コードの中身が読み取れませんでした。コードの途中が書きかわっていないか確かめてください。'); }
+    }
+    m = text.match(/^MIMI1:([A-Za-z0-9+/=]+)/);
+    if (m) {
+      try { return JSON.parse(new TextDecoder().decode(bytesFromB64(m[1]))); } catch {
+        throw new Error('コードが途中で切れているようです。最後までコピーしてください。');
+      }
+    }
+    throw new Error('コードの最初の部分（「MIMI」で始まるところ）がありません。最初から最後まで、全部コピーしてください。');
+  }
+  const transferNote = text => { $('transfer-note').textContent = text; };
+  const codeFileName = () => `mimis-toeic-${dayKey()}.txt`;
+  $('export-btn').addEventListener('click', async () => {
     transferMode = 'export';
+    const code = await encode(store.data);
     $('transfer').hidden = false;
-    $('transfer-text').value = encode(store.data);
+    $('transfer-text').value = code;
     $('transfer-text').readOnly = true;
     $('transfer-go').textContent = 'コピーする';
-    $('transfer-note').textContent = 'このコードを、メモなどに保存しておいてください。';
+    $('transfer-file').textContent = 'ファイルに保存';
+    transferNote(`${code.length.toLocaleString()}文字のコードです。メモに保存するときは、最初の「MIMI」から最後まで全部入っているか確かめてください。LINE などに送ると途中で切れることがあるので、「ファイルに保存」が確実です。`);
     store.data.lastExport = Date.now();
     store.save();
     renderExportLast();
@@ -2717,20 +2758,13 @@
     $('transfer-text').readOnly = false;
     $('transfer-text').focus();
     $('transfer-go').textContent = '読み込む';
-    $('transfer-note').textContent = '引き継ぎコードを貼り付けてください。いまの記録は置きかわります。';
+    $('transfer-file').textContent = 'ファイルから読み込む';
+    transferNote('引き継ぎコードを貼り付けるか、保存したファイルを選んでください。いまの記録は置きかわります。');
   });
-  $('transfer-go').addEventListener('click', async () => {
-    const text = $('transfer-text').value;
-    if (transferMode === 'export') {
-      try { await navigator.clipboard.writeText(text); $('transfer-note').textContent = 'コピーしました。'; } catch {
-        $('transfer-text').select();
-        $('transfer-note').textContent = 'コードを選んだので、長押ししてコピーしてください。';
-      }
-      return;
-    }
+  async function importCode(text) {
     let next;
-    try { next = decode(text); } catch { next = null; }
-    if (!next || next.v !== 1) { $('transfer-note').textContent = 'コードが読み取れませんでした。最後まで貼り付けられているか確かめてください。'; return; }
+    try { next = await decode(text); } catch (e) { transferNote(e.message); return; }
+    if (!next || next.v !== 1) { transferNote('このコードは Mimi\'s TOEIC の記録ではないようです。'); return; }
     if (!(await ask('記録を読み込む？', 'いまの端末の記録は、コードの記録に置きかわります。', '読み込む'))) return;
     store.replace(next);
     store.data.lastVisit = dayNo();
@@ -2738,6 +2772,51 @@
     $('transfer').hidden = true;
     goHome();
     say('記録を引き継いだよ。おかえり！');
+  }
+  $('transfer-go').addEventListener('click', async () => {
+    const text = $('transfer-text').value;
+    if (transferMode !== 'export') { importCode(text); return; }
+    try {
+      await navigator.clipboard.writeText(text);
+      transferNote(`コピーしました（${text.length.toLocaleString()}文字）。貼り付けたあと、最初の「MIMI」から最後まで入っているか確かめてください。`);
+    } catch {
+      // コピーできなかったときは、全部を選んだ状態にして、自分でコピーしてもらう
+      const box = $('transfer-text');
+      box.readOnly = false;
+      box.focus();
+      box.setSelectionRange(0, box.value.length);
+      transferNote('コードを全部選びました。出てきたメニューの「コピー」を押してください。');
+    }
+  });
+  $('transfer-file').addEventListener('click', async () => {
+    if (transferMode !== 'export') { $('transfer-input').click(); return; }
+    const file = new File([$('transfer-text').value], codeFileName(), { type: 'text/plain' });
+    // iPhone・Android は共有シート（「ファイルに保存」や AirDrop）。使えないときはダウンロード
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: 'Mimi\'s TOEIC の引き継ぎコード' });
+        transferNote('保存しました。新しいアプリでは「コードを読み込む」→「ファイルから読み込む」で、このファイルを選んでください。');
+        return;
+      } catch (e) { if (e.name === 'AbortError') return; }
+    }
+    const url = URL.createObjectURL(file);
+    const link = make('a');
+    link.href = url;
+    link.download = file.name;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    transferNote(`「${file.name}」として保存しました。新しいアプリでは「コードを読み込む」→「ファイルから読み込む」で選んでください。`);
+  });
+  $('transfer-input').addEventListener('change', async e => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    let text = '';
+    try { text = await file.text(); } catch { transferNote('ファイルを開けませんでした。'); return; }
+    $('transfer-text').value = text.trim();
+    importCode(text);
   });
   $('erase-btn').addEventListener('click', async () => {
     if (!(await ask('記録をすべて消す？', '単語・文法の記録、XP、連続日数が消えて、元に戻せません。', '消す'))) return;

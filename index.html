@@ -970,12 +970,13 @@ html.calm *, html.calm *::before, html.calm *::after { transition-duration: .01s
     </section>
     <section class="card rise">
       <h2>記録の引き継ぎ</h2>
-      <p class="note">記録はこの端末の中だけに保存されます。機種変更やアプリの入れ直しの前に、引き継ぎコードを作ってメモしておいてください。</p>
+      <p class="note">記録はこの端末の中だけに保存されます。機種変更やアプリの入れ直しの前に、引き継ぎコードを作って、ファイルかメモに保存しておいてください。</p>
       <p class="note" id="export-last"></p>
       <div class="row-btns"><button class="btn ghost" id="export-btn" type="button">引き継ぎコードを作る</button><button class="btn ghost" id="import-btn" type="button">コードを読み込む</button></div>
       <div id="transfer" hidden>
         <textarea class="field" id="transfer-text" spellcheck="false" aria-label="引き継ぎコード"></textarea>
-        <div class="row-btns"><button class="btn" id="transfer-go" type="button">コピーする</button></div>
+        <div class="row-btns"><button class="btn" id="transfer-go" type="button">コピーする</button><button class="btn ghost" id="transfer-file" type="button">ファイルに保存</button></div>
+        <input type="file" id="transfer-input" accept=".txt,text/plain" hidden>
         <p class="note" id="transfer-note" aria-live="polite"></p>
       </div>
       <div class="row-btns"><button class="btn bad" id="erase-btn" type="button">記録をすべて消す</button></div>
