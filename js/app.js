@@ -8,7 +8,7 @@
   const hasDraw = Boolean(window.DrawSVGPlugin);
   const hasPhysics = Boolean(window.Physics2DPlugin);
   if (window.CustomWiggle) window.CustomWiggle.create('errShake', { wiggles: 3, type: 'easeOut' });
-  const VERSION = '1.5.0';
+  const VERSION = '1.5.1';
   const NS = 'http://www.w3.org/2000/svg';
 
   const LINES = window.MIMI_LINES;
@@ -1287,15 +1287,23 @@
   function stemOf(en) {
     return en.length > 4 ? en.replace(/(e|y)$/, '') : en;
   }
-  // 例文の中のその単語（活用した形も）に印をつける
-  function highlight(sentence, en) {
-    const frag = document.createDocumentFragment();
-    const re = new RegExp(`(^|[^${WORD_CHARS}])(${escapeRe(stemOf(en))}[A-Za-zÀ-ÿ]*)`, 'i');
-    const m = sentence.match(re);
-    if (!m) { frag.append(sentence); return frag; }
+  // 例文：単語ごとの span.w に分け（タップで意味が出る）、見出し語（活用した形も）に印をつける。
+  // 印の語をタップすると、単語帳の意味が出る（wordRef）
+  function exampleNode(w) {
+    const p = make('p', 'tapw');
+    p.lang = 'en';
+    const re = new RegExp(`(^|[^${WORD_CHARS}])(${escapeRe(stemOf(w.en))}[A-Za-zÀ-ÿ]*)`, 'i');
+    const m = w.ex.match(re);
+    if (!m) { addWords(p, w.ex); return p; }
     const start = m.index + m[1].length;
-    frag.append(sentence.slice(0, start), make('mark', null, m[2]), sentence.slice(start + m[2].length));
-    return frag;
+    addWords(p, w.ex.slice(0, start));
+    const mark = make('mark');
+    const head = make('span', 'w', m[2]);
+    head.wordRef = w;
+    mark.append(head);
+    p.append(mark);
+    addWords(p, w.ex.slice(start + m[2].length));
+    return p;
   }
   // 意味が重なる語（「空いている」と「空いている、利用できる」など）は、選択肢に並べない
   const senses = ja => ja.replace(/（[^）]*）/g, '').split(/[、,]/).map(s => s.trim()).filter(Boolean);
@@ -1395,7 +1403,7 @@
   }
   // 解説の文：空欄に正解を入れて <b> で囲む。正解の単語をタップすると、その選択肢の品詞と意味が出る
   function filledSentence(text, answer, note) {
-    const p = make('p');
+    const p = make('p', 'tapw');
     p.lang = 'en';
     const [before, after = ''] = text.split('-------');
     addWords(p, before);
@@ -1407,7 +1415,7 @@
     return p;
   }
   function sentenceNode(text, fill) {
-    const p = make('p', 'qtext');
+    const p = make('p', 'qtext tapw');
     p.lang = 'en';
     const [before, after = ''] = text.split('-------');
     addWords(p, before);
@@ -1428,12 +1436,19 @@
   let glossFor = null;
   const cleanWord = raw => raw.replace(/^[^A-Za-zÀ-ÿ]+|[^A-Za-zÀ-ÿ]+$/g, '');
   function lookUpWord(spans, i) {
-    const word = cleanWord(spans[i].textContent);
-    if (!word) return null;
+    const raw = spans[i].textContent;
+    const word = cleanWord(raw);
+    if (!word || /\d/.test(raw)) return null; // 5th や 8:15 などの数字はのぞく
     const prev = i > 0 ? cleanWord(spans[i - 1].textContent).toLowerCase() : '';
     const base = word.replace(/'s$/i, '');
+    // 例文の見出し語：単語帳の意味を出す
+    const ref = spans[i].wordRef;
+    if (ref) return { word: base, ja: ref.ja, lemma: ref.en, pos: POS_JA[ref.pos], own: null };
     if (/^(mr|ms|mrs|dr)$/.test(prev) && /^[A-Z]/.test(word)) return { word: base, name: true };
     const entry = GLOSS[base.toLowerCase()];
+    // gloss.js になければ、単語帳の300語（同じつづり）の意味を使う
+    const own = WORD_BY_EN.get(base.toLowerCase());
+    if (!entry && own) return { word: base, ja: own.ja, lemma: own.en, pos: POS_JA[own.pos], own };
     if (!entry) return null;
     const [pos, ja, lemma] = entry.split('|');
     return {
@@ -1519,15 +1534,14 @@
     glossEl.classList.toggle('g-below', !above);
     glossEl.style.top = `${(above ? r.top - h - 10 : r.bottom + 10) + scrollY}px`;
   }
-  const onWordTap = e => {
-    const span = e.target.closest('.w');
-    if (!span || !span.closest('p')) return;
+  // タップできる文は .tapw（問題文・解説の文・例文）。単語カードの上では、カードの指の動き（bindDrag）のほうで開く
+  document.addEventListener('click', e => {
+    const span = e.target.closest('.tapw .w');
+    if (!span || span.closest('.flash')) return;
     openGloss(span);
-  };
-  quizEls.card.addEventListener('click', onWordTap);
-  quizEls.explain.addEventListener('click', onWordTap);
+  });
   document.addEventListener('pointerdown', e => {
-    if (glossEl.hidden || glossEl.contains(e.target) || e.target.closest('#qcard .w, #explain .w')) return;
+    if (glossEl.hidden || glossEl.contains(e.target) || e.target.closest('.tapw .w')) return;
     closeGloss();
   }, true);
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeGloss(); });
@@ -1611,10 +1625,7 @@
       if (q.kind === 'intro') {
         card.append(make('p', 'intro-meaning', w.ja));
         const ex = make('div', 'ex');
-        const en = make('p');
-        en.lang = 'en';
-        en.append(highlight(w.ex, w.en));
-        ex.append(en, make('p', null, w.exJa));
+        ex.append(exampleNode(w), make('p', null, w.exJa));
         const exRow = make('div', 'full');
         exRow.append(ex, sayButton(w.ex, .9));
         ex.style.flex = '1';
@@ -1923,10 +1934,7 @@
       head.style.fontFamily = 'var(--sans)';
       full.append(head, sayButton(w.en, .85));
       const ex = make('div', 'ex');
-      const exEn = make('p');
-      exEn.lang = 'en';
-      exEn.append(highlight(w.ex, w.en));
-      ex.append(exEn, make('p', null, w.exJa));
+      ex.append(exampleNode(w), make('p', null, w.exJa));
       const exRow = make('div', 'full');
       ex.style.flex = '1';
       exRow.append(ex, sayButton(w.ex, .9));
@@ -2085,10 +2093,7 @@
           const right = make('small', null, `${POS_JA[w.pos]}　${w.ja}`);
           right.lang = 'ja';
           sum.append(right);
-          const ex = make('p');
-          ex.lang = 'en';
-          ex.append(highlight(w.ex, w.en));
-          det.append(sum, ex, make('p', null, w.exJa));
+          det.append(sum, exampleNode(w), make('p', null, w.exJa));
         }
         list.append(det);
       });
@@ -2236,6 +2241,7 @@
     const map = store.data.words;
     const words = only || [...set.words].sort((a, b) => (map[a.id]?.b ?? -1) - (map[b.id]?.b ?? -1));
     deck = { set, words, i: 0, know: 0, again: [], flipped: false, busy: false, card: null };
+    $('deck').querySelectorAll('.flash').forEach(old => old.remove()); // 途中でやめた前のカードを残さない
     show('cards');
     $('deck-done').hidden = true;
     $('deck').hidden = false;
@@ -2244,6 +2250,7 @@
     renderCard();
   }
   function renderCard() {
+    closeGloss();
     if (deck.card) deck.card.remove();
     deck.card = null;
     deck.flipped = false;
@@ -2261,10 +2268,7 @@
     front.append(make('span', 'pos', POS_JA[w.pos]), big, make('span', 'hint', 'タップでめくる ・ 左右にスワイプ'));
     const back = make('div', 'face back');
     const ex = make('div', 'ex');
-    const exEn = make('p');
-    exEn.lang = 'en';
-    exEn.append(highlight(w.ex, w.en));
-    ex.append(exEn, make('p', null, w.exJa));
+    ex.append(exampleNode(w), make('p', null, w.exJa));
     const backWord = make('b', null, w.en);
     backWord.lang = 'en';
     backWord.style.fontSize = '1.2rem';
@@ -2279,6 +2283,7 @@
   }
   function flipCard() {
     if (!deck || !deck.card || deck.busy) return;
+    closeGloss();
     deck.flipped = !deck.flipped;
     const inner = deck.card.querySelector('.flash-in');
     sound.play('flip');
@@ -2292,7 +2297,8 @@
     const stamps = { know: card.querySelector('.stamp.know'), again: card.querySelector('.stamp.again') };
     card.addEventListener('pointerdown', e => {
       if (deck.busy) return;
-      start = { x: e.clientX, y: e.clientY };
+      // 裏（例文がある面）で例文の単語に触れたら、めくらずに意味を出す（end で判断）
+      start = { x: e.clientX, y: e.clientY, word: deck.flipped ? e.target.closest('.tapw .w') : null };
       dx = 0; dy = 0; moved = false; lastX = e.clientX; lastT = performance.now(); vx = 0;
       try { card.setPointerCapture(e.pointerId); } catch { /* 指が離れた後などは捕まえられない */ }
       gsap.killTweensOf(card);
@@ -2312,8 +2318,9 @@
     });
     const end = () => {
       if (!start) return;
+      const word = start.word;
       start = null;
-      if (!moved) { flipCard(); return; }
+      if (!moved) { if (word) openGloss(word); else flipCard(); return; }
       if (Math.abs(dx) > 100 || Math.abs(vx) > .6) { swipe(Math.abs(vx) > .6 ? Math.sign(vx) : Math.sign(dx)); return; }
       gsap.to(card, { x: 0, y: 0, rotation: 0, duration: .6, ease: 'elastic.out(1, .55)' });
       gsap.to([stamps.know, stamps.again], { opacity: 0, duration: .2 });
@@ -2908,8 +2915,14 @@
           const spans = [...sentenceNode(g.q).querySelectorAll('.w, .blank')];
           spans.forEach((s, i) => { if (s.classList.contains('w') && cleanWord(s.textContent) && !lookUpWord(spans, i)) missing.add(`${g.id}:${s.textContent}`); });
         }
+        // 単語の例文も同じように調べる
+        for (const w of WORDS) {
+          const spans = [...exampleNode(w).querySelectorAll('.w')];
+          spans.forEach((s, i) => { if (cleanWord(s.textContent) && !/\d/.test(s.textContent) && !lookUpWord(spans, i)) missing.add(`${w.id}:${s.textContent}`); });
+        }
         return [...missing];
       },
+      exampleNode,
       notesMissing: () => GRAMMAR.filter(g => g.notes.length !== g.opts.length).map(g => g.id),
     });
   }

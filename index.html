@@ -461,8 +461,8 @@ html.bars-themed .tabs { background: var(--bg); -webkit-backdrop-filter: none; b
 .ptag.t-a { color: var(--pos-a); }
 .ptag.t-d { color: var(--pos-d); }
 
-/* 単語の意味の吹き出し（gloss）。問題文と解説の文の単語をタップすると出る */
-#qcard .qtext .w, #explain .full > p .w { cursor: pointer; border-radius: 5px; transition: background-color .15s; }
+/* 単語の意味の吹き出し（gloss）。問題文・解説の文・例文（.tapw）の単語をタップすると出る */
+.tapw .w { cursor: pointer; border-radius: 5px; transition: background-color .15s; }
 .w.g-ph { background: var(--sun-soft); box-shadow: 0 2px 0 0 var(--sun); }
 .w.g-on { background: var(--accent-soft); box-shadow: 0 2px 0 0 var(--accent); }
 .gloss {
