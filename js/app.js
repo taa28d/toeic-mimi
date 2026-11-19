@@ -8,7 +8,7 @@
   const hasDraw = Boolean(window.DrawSVGPlugin);
   const hasPhysics = Boolean(window.Physics2DPlugin);
   if (window.CustomWiggle) window.CustomWiggle.create('errShake', { wiggles: 3, type: 'easeOut' });
-  const VERSION = '1.4.4';
+  const VERSION = '1.4.5';
   const NS = 'http://www.w3.org/2000/svg';
 
   const LINES = window.MIMI_LINES;
@@ -2338,6 +2338,10 @@
     document.documentElement.classList.toggle('bars-themed', homeApp && navigator.standalone !== true && bottom === 0 && matchMedia('(pointer: coarse)').matches);
   }
   window.addEventListener('resize', measureBars);
+  // 上の端のぼかし（.topfade）は、スクロールしたときだけ出す（止まっているときに1行目がにじまないように）
+  const markScrolled = () => document.documentElement.classList.toggle('scrolled', window.scrollY > 4);
+  window.addEventListener('scroll', markScrolled, { passive: true });
+  markScrolled();
   function showDebug() {
     if ($('dbg')) return;
     const probe = getComputedStyle($('saProbe'));

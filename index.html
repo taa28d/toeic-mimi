@@ -610,6 +610,16 @@ html.bars-themed body.no-tabs .navfade {
      そのため帯は最低 12px（10px 以下だと iOS が帯と見なさない）。12px は .app の上の余白と同じで、何も隠さない
    - 帯は最初の表示からあり、タップを受ける（pointer-events: none や透明だと帯と見なされない）。色はグラデーションにしない */
 .topcover { position: fixed; top: 0; left: 0; right: 0; height: max(var(--sa-top), 12px); z-index: 18; background: var(--bg); }
+/* 帯の下の、上から下へ薄くなるぼかし。スクロールした中身が帯の境目でくっきり切れないようにする。
+   スクロールしたときだけ出す（html.scrolled は app.js）。タップは受けない */
+.topfade {
+  position: fixed; left: 0; right: 0; top: max(var(--sa-top), 12px); height: 26px; z-index: 18; pointer-events: none;
+  background: linear-gradient(var(--bg), color-mix(in srgb, var(--bg) 0%, transparent));
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  -webkit-mask-image: linear-gradient(#000, transparent); mask-image: linear-gradient(#000, transparent);
+  opacity: 0; transition: opacity .25s;
+}
+html.scrolled .topfade { opacity: 1; }
 #saProbe { position: fixed; top: 0; left: 0; width: 0; visibility: hidden; pointer-events: none; padding: var(--sa-top) 0 var(--sa-bottom); }
 
 /* ── 広い画面：2列 ── */
@@ -948,6 +958,7 @@ html.calm *, html.calm *::before, html.calm *::after { transition-duration: .01s
 <div class="fx" id="fx" aria-hidden="true"></div>
 <div class="navfade" aria-hidden="true"></div>
 <div class="topcover" aria-hidden="true"></div>
+<div class="topfade" aria-hidden="true"></div>
 <!-- ミミのせりふを読み上げソフトへ1文まとめて伝える（見た目のふきだしは1文字ずつ動くので、読み上げからは外している） -->
 <p class="sr" id="sr-say" aria-live="polite"></p>
 <div class="toast" id="toast" role="status" hidden>
