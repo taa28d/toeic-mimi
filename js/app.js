@@ -8,7 +8,7 @@
   const hasDraw = Boolean(window.DrawSVGPlugin);
   const hasPhysics = Boolean(window.Physics2DPlugin);
   if (window.CustomWiggle) window.CustomWiggle.create('errShake', { wiggles: 3, type: 'easeOut' });
-  const VERSION = '1.6.1';
+  const VERSION = '1.6.2';
   const NS = 'http://www.w3.org/2000/svg';
 
   const LINES = window.MIMI_LINES;
@@ -2716,7 +2716,10 @@
   }
   // 読めないときは、どこが悪いかがわかる文を投げる
   async function decode(raw) {
-    const text = String(raw).replace(/\s+/g, '');
+    // iPhone が最初の「MIMI」を小文字にしたり、「:」を全角の「：」にしたりすることがあるので、最初の部分はゆるく読む
+    const text = String(raw).replace(/\s+/g, '')
+      .replace(/^mimi([12])[:：]/i, 'MIMI$1:')
+      .replace(/^(MIMI2:\d+)：/, '$1:');
     if (!text) throw new Error('引き継ぎコードを貼り付けてください。');
     let m = text.match(/^MIMI2:(\d+):([A-Za-z0-9+/=]*)/);
     if (m) {

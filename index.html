@@ -974,7 +974,7 @@ html.calm *, html.calm *::before, html.calm *::after { transition-duration: .01s
       <p class="note" id="export-last"></p>
       <div class="row-btns"><button class="btn ghost" id="export-btn" type="button">引き継ぎコードを作る</button><button class="btn ghost" id="import-btn" type="button">コードを読み込む</button></div>
       <div id="transfer" hidden>
-        <textarea class="field" id="transfer-text" spellcheck="false" aria-label="引き継ぎコード"></textarea>
+        <textarea class="field" id="transfer-text" spellcheck="false" autocapitalize="off" autocorrect="off" autocomplete="off" aria-label="引き継ぎコード"></textarea>
         <div class="row-btns"><button class="btn" id="transfer-go" type="button">コピーする</button><button class="btn ghost" id="transfer-file" type="button">ファイルに保存</button></div>
         <input type="file" id="transfer-input" accept=".txt,text/plain" hidden>
         <p class="note" id="transfer-note" aria-live="polite"></p>
