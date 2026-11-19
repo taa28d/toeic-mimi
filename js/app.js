@@ -8,7 +8,7 @@
   const hasDraw = Boolean(window.DrawSVGPlugin);
   const hasPhysics = Boolean(window.Physics2DPlugin);
   if (window.CustomWiggle) window.CustomWiggle.create('errShake', { wiggles: 3, type: 'easeOut' });
-  const VERSION = '1.4.1';
+  const VERSION = '1.4.2';
   const NS = 'http://www.w3.org/2000/svg';
 
   const LINES = window.MIMI_LINES;
@@ -1802,7 +1802,9 @@
     LEVELS.forEach(level => {
       const head = make('div', 'level-head');
       // 「Lv.」は自分のレベル（Lv.3 など）とまぎれるので、単語の段階は STEP と呼ぶ
-      head.append(make('b', null, `STEP ${level.level}`), make('h2', null, level.name), make('small', null, level.note));
+      const badge = make('b');
+      badge.append(make('span', 'step-label', 'STEP'), ' ', make('span', 'step-no', level.level));
+      head.append(badge, make('h2', null, level.name), make('small', null, level.note));
       const list = make('div', 'sets');
       SETS.filter(set => set.level === level.level).forEach(set => {
         const done = set.words.filter(wordLearned).length;
