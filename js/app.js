@@ -8,7 +8,7 @@
   const hasDraw = Boolean(window.DrawSVGPlugin);
   const hasPhysics = Boolean(window.Physics2DPlugin);
   if (window.CustomWiggle) window.CustomWiggle.create('errShake', { wiggles: 3, type: 'easeOut' });
-  const VERSION = '1.4.2';
+  const VERSION = '1.4.3';
   const NS = 'http://www.w3.org/2000/svg';
 
   const LINES = window.MIMI_LINES;
@@ -2347,6 +2347,7 @@
       `visualViewport ${window.visualViewport ? Math.round(visualViewport.height) : '-'}`,
       `ホーム画面から ${matchMedia('(display-mode: standalone)').matches || navigator.standalone ? 'はい' : 'いいえ'}`,
       `余白 上${probe.paddingTop} 下${probe.paddingBottom}`,
+      `上の帯 ${Math.round(document.querySelector('.topcover').getBoundingClientRect().height)}px`,
       `下のバー ${document.documentElement.classList.contains('bars-themed') ? 'ブラウザが塗る' : 'アプリが描く'}`,
       `動きを減らす ${calm() ? 'はい' : 'いいえ'}`,
     ];

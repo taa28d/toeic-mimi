@@ -602,11 +602,11 @@ html.bars-themed body.no-tabs .navfade {
   background: linear-gradient(to top, var(--bg), color-mix(in srgb, var(--bg) 0%, transparent));
 }
 /* iPhone（iOS 26）は、ステータスバーの裏に来たページをぼかして見せ、そのぼかしが少し下（日付やレベルの行）までにじむ。
-   上の端に、背景色で塗った横幅いっぱいの帯を置くと、iOS はぼかさずにその色で塗る。
-   帯は最初の表示からあり、タップを受ける（pointer-events: none や透明だと iOS が帯と見なさない）。
-   下の短いぼかしは、スクロールした文字が帯の境目でぶつ切りに見えないようにするもの */
-.topcover { position: fixed; top: 0; left: 0; right: 0; height: var(--sa-top); z-index: 18; background: var(--bg); }
-.topcover::after { content: ""; position: absolute; top: 100%; left: 0; right: 0; height: 10px; pointer-events: none; background: linear-gradient(var(--bg), color-mix(in srgb, var(--bg) 0%, transparent)); }
+   表示域のいちばん上に、背景色で塗った横幅いっぱいの固定の帯があると、iOS はぼかさずにステータスバーをその色で塗る。
+   - ホーム画面アプリ（status-bar-style default）は表示域がステータスバーの下から始まり、上の余白は 0。
+     そのため帯は最低 12px（10px 以下だと iOS が帯と見なさない）。12px は .app の上の余白と同じで、何も隠さない
+   - 帯は最初の表示からあり、タップを受ける（pointer-events: none や透明だと帯と見なされない）。色はグラデーションにしない */
+.topcover { position: fixed; top: 0; left: 0; right: 0; height: max(var(--sa-top), 12px); z-index: 18; background: var(--bg); }
 #saProbe { position: fixed; top: 0; left: 0; width: 0; visibility: hidden; pointer-events: none; padding: var(--sa-top) 0 var(--sa-bottom); }
 
 /* ── 広い画面：2列 ── */
