@@ -8,7 +8,7 @@
   const hasDraw = Boolean(window.DrawSVGPlugin);
   const hasPhysics = Boolean(window.Physics2DPlugin);
   if (window.CustomWiggle) window.CustomWiggle.create('errShake', { wiggles: 3, type: 'easeOut' });
-  const VERSION = '1.4.5';
+  const VERSION = '1.5.0';
   const NS = 'http://www.w3.org/2000/svg';
 
   const LINES = window.MIMI_LINES;
@@ -20,9 +20,29 @@
     words: set.words.map(([en, pos, ja, ex, exJa]) => ({ id: `${en}.${pos}`, en, pos, ja, ex, exJa, set: index })),
   }));
   const WORDS = SETS.flatMap(set => set.words);
+  const WORD = new Map(WORDS.map(w => [w.id, w]));
+  const WORD_BY_EN = new Map(WORDS.map(w => [w.en.toLowerCase(), w]));
   const CAT = new Map(CATS.map(cat => [cat.id, cat]));
+  // 選択肢の品詞と意味（js/grammar-notes.js）。「品詞｜意味」を { label, ja } にする
+  const OPT_NOTES = window.TOEIC_OPT_NOTES || {};
+  const parseNote = text => {
+    const [label, ja = ''] = String(text).split('｜');
+    return { label: label.trim(), ja: ja.trim() };
+  };
+  // 品詞のまとまり：かっこの中を外し、「・」の前だけを見る（「動詞（過去形・過去分詞）」→「動詞」）
+  const posClass = label => label.replace(/（[^）]*）/g, '').split('・')[0].trim();
   const GRAMMAR = CATS.flatMap(cat => (window.TOEIC_GRAMMAR[cat.id] || [])
-    .map(([q, opts, ja, why], i) => ({ id: `${cat.id}-${i + 1}`, cat: cat.id, q, opts, ja, why })));
+    .map(([q, opts, ja, why], i) => {
+      const id = `${cat.id}-${i + 1}`;
+      const notes = (OPT_NOTES[id] || []).map(parseNote);
+      return { id, cat: cat.id, q, opts, ja, why, notes, rightClass: notes[0] ? posClass(notes[0].label) : '' };
+    }));
+  const GMAP = new Map(GRAMMAR.map(g => [g.id, g]));
+  // 問題文の単語の意味（js/gloss.js）
+  const GLOSS = window.TOEIC_GLOSS || {};
+  const PHRASES = (window.TOEIC_PHRASES || []).map(([text, ja]) => ({ text, ja, words: text.split(' ') }))
+    .sort((a, b) => b.words.length - a.words.length);
+  const GLOSS_POS = { n: '名詞', v: '動詞', a: '形容詞', d: '副詞', p: '前置詞', c: '接続詞', r: '代名詞', x: '助動詞', t: '冠詞', z: '敬称', l: '地名', ab: '略語', num: '数' };
 
   const $ = id => document.getElementById(id);
   const make = (tag, className, text) => {
@@ -63,6 +83,9 @@
       settings: { timer: 20, sound: true, music: true, voice: true, speak: true, speakAfter: true, motion: 'auto' },
       xp: 0, streak: { last: null, count: 0, best: 0 },
       days: {}, words: {}, gram: {}, history: [], seenLesson: {},
+      // 最近の答え（新しいものが後ろ。最大 LOG_MAX 件）。[日, 'g'か'w', 問題の id, 正解なら1, まちがえたときに選んだもの]
+      // 選んだものは、文法なら選択肢の番号（grammar.js の並び。0が正解）、単語なら選んだ単語の id
+      log: [], hint: {},
     });
     const plain = v => v && typeof v === 'object' && !Array.isArray(v);
     function merge(base, saved) {
@@ -641,10 +664,96 @@
     const s = map[id] || (map[id] = { b: 0, d: t, n: 0, ok: 0 });
     s.n++;
     if (ok) { s.ok++; s.b = Math.min(s.b + 1, INTERVAL.length - 1); } else s.b = 0;
-    s.d = t + (ok ? INTERVAL[s.b] : 0);
+    // 何度もまちがえた問題は、正解しても次に出すまでを短めにする（2回で6割、4回で4割）
+    const misses = s.n - s.ok;
+    const shrink = misses >= 4 ? .4 : misses >= 2 ? .6 : 1;
+    s.d = t + (ok ? Math.max(1, Math.round(INTERVAL[s.b] * shrink)) : 0);
     s.last = ok ? 1 : 0;
     s.at = Date.now();
     if (time != null) s.t = Math.round(time * 10) / 10;
+  }
+
+  /* 苦手の傾向。最近の答え（store.data.log）から、分野ごとの力・まちがえ方・まちがえやすい単語をつかむ。
+     ここで出した結果で、次の問題の組み立て（nextGrammar・composeDaily）と、記録の画面の「苦手の傾向」を決める */
+  const LOG_MAX = 300;
+  function logAnswer(kind, id, ok, chose) {
+    const log = store.data.log;
+    log.push(ok || chose == null ? [dayNo(), kind, id, ok ? 1 : 0] : [dayNo(), kind, id, 0, chose]);
+    if (log.length > LOG_MAX) log.splice(0, log.length - LOG_MAX);
+  }
+  const dayOf = at => (at ? dayNo(new Date(at)) : -1);
+  // 分野ごとの「いまの力」：最近12問の結果を重く、それまでの通算を半分の重さで見る。まだ解いていない分野は7割とみなす
+  function catSkills() {
+    const out = new Map(CATS.map(c => [c.id, { n: 0, ok: 0, rn: 0, rok: 0, acc: .7 }]));
+    for (const g of GRAMMAR) {
+      const s = store.data.gram[g.id];
+      if (s) { const c = out.get(g.cat); c.n += s.n; c.ok += s.ok; }
+    }
+    const log = store.data.log;
+    for (let i = log.length - 1; i >= 0; i--) {
+      const [, kind, id, ok] = log[i];
+      const c = kind === 'g' && out.get(GMAP.get(id)?.cat);
+      if (!c || c.rn >= 12) continue;
+      c.rn++;
+      c.rok += ok;
+    }
+    for (const c of out.values()) c.acc = (c.rok + c.ok * .5 + 1.4) / (c.rn + c.n * .5 + 2);
+    return out;
+  }
+  // まちがえ方：最近3週間の文法のまちがいを、「正解の品詞」と「選んだ品詞」の組み合わせで数える。
+  // 品詞のまとまりがちがえば「副詞 ← 形容詞」、同じなら形まで見て「動詞（現在完了）← 動詞（過去形）」
+  function confusions(days = 21) {
+    const since = dayNo() - days;
+    const counts = new Map();
+    for (const [day, kind, id, ok, chose] of store.data.log) {
+      if (kind !== 'g' || ok || chose == null || day < since) continue;
+      const g = GMAP.get(id);
+      const right = g?.notes[0]?.label;
+      const picked = g?.notes[chose]?.label;
+      if (!right || !picked || right === picked) continue;
+      const pair = posClass(right) !== posClass(picked) ? [posClass(right), posClass(picked)] : [right, picked];
+      const key = `${g.cat}|${pair[0]}|${pair[1]}`;
+      const entry = counts.get(key) || { cat: g.cat, right: pair[0], chose: pair[1], n: 0, last: 0 };
+      entry.n++;
+      entry.last = Math.max(entry.last, day);
+      counts.set(key, entry);
+    }
+    return [...counts.values()].sort((a, b) => (b.n - a.n) || (b.last - a.last));
+  }
+  // 分野ごとに、ねらって出したい「正解の品詞」（まちがえ方で多いもの）
+  function aimsByCat() {
+    const aims = new Map();
+    for (const c of confusions()) {
+      if (!aims.has(c.cat)) aims.set(c.cat, []);
+      aims.get(c.cat).push(c.right);
+    }
+    return aims;
+  }
+  const aimHit = (g, aims) => (aims.get(g.cat) || []).some(r => r === g.rightClass || r === g.notes[0]?.label);
+  // いま多めに出している分野（いまの力が7割2分より低いもの。低い順に2つまで）
+  function weakFocus() {
+    const skills = catSkills();
+    const conf = confusions();
+    return CATS.map(cat => ({ cat, ...skills.get(cat.id) }))
+      .filter(x => x.rn + x.n >= 4 && x.acc < .72)
+      .sort((a, b) => a.acc - b.acc)
+      .slice(0, 2)
+      .map(x => ({ ...x, conf: conf.find(k => k.cat === x.cat.id) || null }));
+  }
+  // まちがえやすい単語：まちがえた回数が多く、まだ定着していない語
+  function weakWords(count = 5) {
+    const map = store.data.words;
+    return WORDS.filter(w => map[w.id] && map[w.id].n > map[w.id].ok && (map[w.id].last === 0 || map[w.id].b < 3))
+      .sort((a, b) => ((map[b.id].n - map[b.id].ok) - (map[a.id].n - map[a.id].ok)) || ((map[b.id].at || 0) - (map[a.id].at || 0)))
+      .slice(0, count);
+  }
+  // 類題：同じ分野で、正解の品詞が同じ問題を優先（まだ解いていないもの → 苦手なものの順）。今日もう解いた問題は出さない
+  function similarGrammar(g, exclude) {
+    const map = store.data.gram;
+    const today = dayNo();
+    const score = x => (x.rightClass === g.rightClass ? 0 : 2) + (map[x.id] ? 1 : 0);
+    return GRAMMAR.filter(x => x.cat === g.cat && x.id !== g.id && !exclude.has(x.id) && dayOf(map[x.id]?.at) !== today)
+      .sort((a, b) => (score(a) - score(b)) || ((map[a.id]?.b ?? -1) - (map[b.id]?.b ?? -1)))[0] || null;
   }
   const wordLearned = w => (store.data.words[w.id]?.b || 0) >= 3;
   const gramMastered = g => store.data.gram[g.id]?.last === 1;
@@ -675,21 +784,44 @@
   }
   // 品詞と語彙は本番でよく出るので、ほかの分野より多めに回す
   const WEIGHT = { pos: 3, vocab: 2 };
-  function nextGrammar(count, exclude = new Set(), cats = CATS.map(c => c.id)) {
+  // 次に出す文法の問題。adaptive（今日のレッスン・分野の練習）は苦手に合わせて配る：
+  //  ・分野の重み ＝ 本番での出やすさ × e^(4.5 ×（0.7 − いまの力））（5倍まで）。いまの力が4割の分野は、
+  //    7割（まだ解いていない分野と同じ）の約4倍、9割の分野の約10倍出る
+  //  ・同じ分野の中では、まちがえ方で多い「正解の品詞」の問題を先に出す（副詞の所で形容詞を選びがちなら、副詞が入る問題）
+  //  ・まだ解いていない問題がなくなった分野は、苦手な問題（箱の番号が小さいもの）から出し直す
+  // adaptive でないとき（実戦20問）は本番の配分で、まだ解いていない問題を先に出す。
+  // 配り方は「なめらかな重みつき順番」なので、同じ記録からはいつも同じ組み合わせになる（ホームの数と始めた中身がずれない）
+  function nextGrammar(count, exclude = new Set(), cats = CATS.map(c => c.id), { adaptive = true } = {}) {
     const map = store.data.gram;
-    const lists = cats.map(id => ({ id, left: GRAMMAR.filter(g => g.cat === id && !map[g.id] && !exclude.has(g.id)) }));
+    const today = dayNo();
+    const skills = adaptive ? catSkills() : null;
+    const aims = adaptive ? aimsByCat() : new Map();
+    const byAim = list => [...list.filter(g => aimHit(g, aims)), ...list.filter(g => !aimHit(g, aims))];
+    const seenOrder = (a, b) => ((dayOf(map[a.id].at) === today) - (dayOf(map[b.id].at) === today))
+      || (map[a.id].b - map[b.id].b) || ((map[a.id].at || 0) - (map[b.id].at || 0));
+    const lists = cats.map(id => {
+      const list = GRAMMAR.filter(g => g.cat === id && !exclude.has(g.id));
+      return {
+        id, cur: 0,
+        weight: (WEIGHT[id] || 1) * (skills ? Math.min(5, Math.exp(4.5 * (.7 - skills.get(id).acc))) : 1),
+        fresh: byAim(list.filter(g => !map[g.id])),
+        seen: byAim(list.filter(g => map[g.id]).sort(seenOrder)),
+      };
+    });
     const out = [];
-    while (out.length < count && lists.some(list => list.left.length)) {
-      for (const list of lists) {
-        for (let k = 0; k < (WEIGHT[list.id] || 1) && list.left.length && out.length < count; k++) out.push(list.left.shift());
+    const deal = take => {
+      while (out.length < count) {
+        const open = lists.filter(l => take(l).length);
+        if (!open.length) return;
+        const total = open.reduce((s, l) => s + l.weight, 0);
+        open.forEach(l => { l.cur += l.weight; });
+        const best = open.reduce((a, b) => (b.cur > a.cur ? b : a));
+        best.cur -= total;
+        out.push(take(best).shift());
       }
-    }
-    if (out.length < count) {
-      const taken = new Set([...out.map(g => g.id), ...exclude]);
-      const seen = GRAMMAR.filter(g => cats.includes(g.cat) && !taken.has(g.id))
-        .sort((a, b) => ((map[a.id]?.b ?? 0) - (map[b.id]?.b ?? 0)) || ((map[a.id]?.at ?? 0) - (map[b.id]?.at ?? 0)));
-      out.push(...seen.slice(0, count - out.length));
-    }
+    };
+    if (adaptive) deal(l => (l.fresh.length ? l.fresh : l.seen));
+    else { deal(l => l.fresh); deal(l => l.seen); }
     return out;
   }
   function interleave(a, b) {
@@ -714,7 +846,16 @@
     }
     const nW = freshWords().slice(0, Math.min(Math.round(N * .3), 10));
     const nG = nextGrammar(Math.max(0, N - rW.length - rG.length - nW.length), new Set(rG.map(g => g.id)));
-    return { rW, rG, nW, nG };
+    return { rW, rG, nW, nG, focus: weakFocus() };
+  }
+  // 「いま多めに出しているもの」を1行で（ホーム・結果・記録で使う）
+  function focusText(focus) {
+    // 「品詞」（とくに副詞が入る問題）と「時制」。形のちがい（動詞（過去形））は、かっこの中だけを使う
+    return focus.map((x, i) => {
+      const right = x.conf && x.conf.right;
+      const aim = i === 0 && right ? `（とくに${(right.match(/（(.+)）/) || [])[1] || right}が入る問題）` : '';
+      return `「${x.cat.name}」${aim}`;
+    }).join('と');
   }
 
   /* ━━ 7. ミミ ━━ */
@@ -796,6 +937,7 @@
     const same = current === name;
     for (const [key, screen] of Object.entries(screens)) screen.hidden = key !== name;
     document.body.dataset.screen = name;
+    closeGloss();
     const tabbed = TABBED.includes(name);
     const wasHidden = tabsEl.hidden;
     tabsEl.hidden = !tabbed;
@@ -1110,6 +1252,8 @@
     if (plan.nW.length) chips.push(`新しい単語 ${plan.nW.length}`);
     if (plan.nG.length) chips.push(`文法 ${plan.nG.length}`);
     $('today-chips').replaceChildren(...chips.map(text => make('span', null, text)));
+    // 苦手な分野を多めにしているときは、それも見せる
+    if (plan.focus.length && plan.nG.length) $('today-chips').append(make('span', 'chip-focus', `苦手な${plan.focus[0].cat.name}を多めに`));
     $('today-goal').textContent = `/${goal}問`;
     countTo($('today-num'), today.q);
     setRing($('today-ring'), today.q / goal);
@@ -1159,16 +1303,19 @@
     const sa = senses(a.ja);
     return senses(b.ja).some(s => sa.includes(s));
   }
+  // 前にこの語と取りちがえた語（store の mix）は、まちがえやすさを確かめるため、選択肢に入れる（2つまで）
   function wordChoices(w, field) {
-    const pool = WORDS.filter(x => x.pos === w.pos && x.id !== w.id && x[field] !== w[field] && !overlaps(w, x));
+    const fits = x => x.pos === w.pos && x.id !== w.id && x[field] !== w[field] && !overlaps(w, x);
+    const pool = WORDS.filter(fits);
     const near = pool.filter(x => SETS[x.set].level === SETS[w.set].level);
+    const mixed = wordLearned(w) ? [] : (store.data.words[w.id]?.mix || []).map(id => WORD.get(id)).filter(x => x && fits(x)).slice(0, 2);
     const picks = [];
-    for (const x of shuffle(near.length >= 6 ? near : pool)) {
+    for (const x of [...mixed, ...shuffle(near.length >= 6 ? near : pool)]) {
       if (picks.length === 3) break;
-      if (picks.some(p => p[field] === x[field] || overlaps(p, x))) continue;
+      if (picks.some(p => p.id === x.id || p[field] === x[field] || overlaps(p, x))) continue;
       picks.push(x);
     }
-    return shuffle([{ text: w[field], right: true }, ...picks.map(x => ({ text: x[field], right: false }))]);
+    return shuffle([{ text: w[field], right: true, word: w }, ...picks.map(x => ({ text: x[field], right: false, word: x }))]);
   }
   function wordMode(w, fresh) {
     const b = store.data.words[w.id]?.b || 0;
@@ -1181,30 +1328,34 @@
     if (item.type === 'intro') return { kind: 'intro', item, word: item.word, tag: '新しい単語', tagClass: 'sun' };
     if (item.type === 'grammar') {
       const g = item.g;
+      const name = CAT.get(g.cat).name;
       return {
         kind: 'grammar', item, g, timed: round.seconds > 0,
-        tag: round.drill ? 'Part 5' : `Part 5 ・ ${CAT.get(g.cat).name}`,
+        tag: item.similar ? `類題 ・ ${name}` : item.again ? `もう一度 ・ ${name}` : round.drill ? 'Part 5' : `Part 5 ・ ${name}`,
+        tagClass: item.similar || item.again ? 'bad' : '',
         choiceLang: 'en',
-        choices: shuffle(g.opts.map((text, i) => ({ text, right: i === 0 }))),
+        // oi は grammar.js の並びでの番号（0が正解）。まちがえ方の記録に使う
+        choices: shuffle(g.opts.map((text, i) => ({ text, right: i === 0, oi: i, note: g.notes[i] || null }))),
       };
     }
     const w = item.word;
     const mode = item.mode || wordMode(w, item.fresh);
-    const tag = item.review ? '復習 ・ 単語' : '単語';
-    if (mode === 'reverse') return { kind: 'reverse', item, word: w, tag, tagClass: item.review ? 'bad' : 'sun', choiceLang: 'en', choices: wordChoices(w, 'en') };
-    return { kind: mode, item, word: w, tag, tagClass: item.review ? 'bad' : 'sun', choiceLang: 'ja', choices: wordChoices(w, 'ja') };
+    const tag = item.again ? 'もう一度 ・ 単語' : item.review ? '復習 ・ 単語' : '単語';
+    const tagClass = item.review || item.again ? 'bad' : 'sun';
+    if (mode === 'reverse') return { kind: 'reverse', item, word: w, tag, tagClass, choiceLang: 'en', choices: wordChoices(w, 'en') };
+    return { kind: mode, item, word: w, tag, tagClass, choiceLang: 'ja', choices: wordChoices(w, 'ja') };
   }
 
   /* ━━ 14. 問題を解く ━━ */
   let round = null;
   const quizEls = { card: $('qcard'), choices: $('choices'), explain: $('explain'), foot: $('quiz-foot'), next: $('quiz-next') };
 
-  function startRound({ title, kind, items, seconds = timerSec(), drill = false }) {
+  function startRound({ title, kind, items, seconds = timerSec(), drill = false, focus = [] }) {
     if (!items.length) return;
     stopRound();
     round = {
-      title, kind, items, drill, seconds,
-      i: -1, results: [], combo: 0, best: 0, xp: 0,
+      title, kind, items, drill, seconds, focus,
+      i: -1, results: [], combo: 0, best: 0, xp: 0, added: 0,
       xpBefore: store.data.xp, dayBefore: todayStat().q, q: null, answered: false, busy: false,
     };
     show('quiz');
@@ -1234,24 +1385,217 @@
       say('この端末では読み上げが使えないみたい。');
     }
   }
+  // 文を単語ごとの span.w に分ける（タップで意味を出す・入るときの動きに使う）
+  function addWords(parent, chunk, className = 'w') {
+    chunk.split(/(\s+)/).forEach(part => {
+      if (!part) return;
+      if (/^\s+$/.test(part)) parent.append(part);
+      else parent.append(make('span', className, part));
+    });
+  }
+  // 解説の文：空欄に正解を入れて <b> で囲む。正解の単語をタップすると、その選択肢の品詞と意味が出る
+  function filledSentence(text, answer, note) {
+    const p = make('p');
+    p.lang = 'en';
+    const [before, after = ''] = text.split('-------');
+    addWords(p, before);
+    const b = make('b');
+    addWords(b, answer, 'w ans');
+    b.querySelectorAll('.ans').forEach(span => { span.answerNote = note; });
+    p.append(b);
+    addWords(p, after);
+    return p;
+  }
   function sentenceNode(text, fill) {
     const p = make('p', 'qtext');
     p.lang = 'en';
     const [before, after = ''] = text.split('-------');
-    const addWords = chunk => chunk.split(/(\s+)/).forEach(part => {
-      if (!part) return;
-      if (/^\s+$/.test(part)) p.append(part);
-      else p.append(make('span', 'w', part));
-    });
-    addWords(before);
+    addWords(p, before);
     const blank = make('span', 'blank', fill || ' ');
     blank.setAttribute('aria-label', fill || '空欄');
     p.append(blank);
-    addWords(after);
+    addWords(p, after);
     return p;
   }
 
+  /* ━━ 14b. 単語の意味の吹き出し（問題文の単語をタップ） ━━
+     意味は js/gloss.js。2語以上の決まった言い方（TOEIC_PHRASES）は、文の中にそろって見えているときだけ出す。
+     答える前は空欄があるので、空欄をまたぐ言い方（responsible for など、答えにつながるもの）は出ない */
+  const glossEl = make('div', 'gloss');
+  glossEl.hidden = true;
+  glossEl.setAttribute('role', 'status');
+  document.body.append(glossEl);
+  let glossFor = null;
+  const cleanWord = raw => raw.replace(/^[^A-Za-zÀ-ÿ]+|[^A-Za-zÀ-ÿ]+$/g, '');
+  function lookUpWord(spans, i) {
+    const word = cleanWord(spans[i].textContent);
+    if (!word) return null;
+    const prev = i > 0 ? cleanWord(spans[i - 1].textContent).toLowerCase() : '';
+    const base = word.replace(/'s$/i, '');
+    if (/^(mr|ms|mrs|dr)$/.test(prev) && /^[A-Z]/.test(word)) return { word: base, name: true };
+    const entry = GLOSS[base.toLowerCase()];
+    if (!entry) return null;
+    const [pos, ja, lemma] = entry.split('|');
+    return {
+      word: base, ja, lemma,
+      pos: pos.split(',').map(code => GLOSS_POS[code] || code).join('・'),
+      own: WORD_BY_EN.get((lemma || base).toLowerCase()) || WORD_BY_EN.get(base.toLowerCase()) || null,
+    };
+  }
+  // この単語を含む決まった言い方（長いものが先）。spans には空欄も入れて、空欄をまたぐ言い方が見つからないようにする
+  function phraseAt(spans, i) {
+    const keys = spans.map(s => (s.classList.contains('blank') ? '\u0000' : cleanWord(s.textContent).toLowerCase()));
+    for (const ph of PHRASES) {
+      for (let j = 0; j < ph.words.length; j++) {
+        const start = i - j;
+        if (start < 0 || start + ph.words.length > keys.length) continue;
+        if (ph.words.every((w, k) => keys[start + k] === w)) return { ...ph, from: start, to: start + ph.words.length };
+      }
+    }
+    return null;
+  }
+  function closeGloss() {
+    if (glossEl.hidden) return;
+    glossEl.hidden = true;
+    document.querySelectorAll('.w.g-on, .w.g-ph').forEach(s => s.classList.remove('g-on', 'g-ph'));
+    glossFor = null;
+  }
+  function openGloss(span) {
+    if (glossFor === span) { closeGloss(); return; }
+    const spans = [...span.closest('p').querySelectorAll('.w, .blank')];
+    const i = spans.indexOf(span);
+    const note = span.answerNote || null;
+    const info = note ? null : lookUpWord(spans, i);
+    const phrase = phraseAt(spans, i);
+    if (!note && !info && !phrase) return;
+    closeGloss();
+    glossFor = span;
+    span.classList.add('g-on');
+    if (phrase) spans.slice(phrase.from, phrase.to).forEach(s => s.classList.add('g-ph'));
+    const box = [];
+    const head = make('p', 'gloss-head');
+    const en = make('b', null, note ? span.closest('b').textContent : info ? info.word : cleanWord(span.textContent));
+    en.lang = 'en';
+    head.append(en);
+    if (info && info.lemma && info.lemma.toLowerCase() !== info.word.toLowerCase()) {
+      const base = make('small', null, '元の形 ');
+      const b = make('span', null, info.lemma);
+      b.lang = 'en';
+      base.append(b);
+      head.append(base);
+    }
+    box.push(head);
+    const line = make('p', 'gloss-ja');
+    if (note) line.append(make('span', `ptag t-${posTone(note.label)}`, note.label), note.ja);
+    else if (info && info.name) line.append(make('span', 'ptag', '名前'), '人の名前');
+    else if (info) line.append(make('span', `ptag t-${posTone(info.pos)}`, info.pos), info.ja);
+    if (line.childNodes.length) box.push(line);
+    if (phrase) {
+      const ph = make('p', 'gloss-ph');
+      const b = make('b', null, phrase.text);
+      b.lang = 'en';
+      ph.append(b, phrase.ja);
+      box.push(ph);
+    }
+    if (info && info.own) box.push(make('p', 'gloss-own', `単語帳にある語（セット${info.own.set + 1}「${SETS[info.own.set].name}」）`));
+    glossEl.replaceChildren(...box);
+    glossEl.hidden = false;
+    placeGloss(span);
+    if (!store.data.hint.glossUsed) { store.data.hint.glossUsed = 1; store.save(); }
+    mimi.lookAt(glossEl);
+    if (!calm()) gsap.fromTo(glossEl, { opacity: 0, y: 6 }, { opacity: 1, y: 0, duration: .2, ease: 'power3.out', clearProps: 'opacity,transform' });
+  }
+  // 単語の上に出す。上に場所がなければ下に。左右は画面からはみ出さないようにずらす
+  function placeGloss(span) {
+    const r = span.getBoundingClientRect();
+    const w = Math.min(320, innerWidth - 24);
+    glossEl.style.width = `${w}px`;
+    const left = clamp(r.left + r.width / 2 - w / 2, 12, innerWidth - w - 12);
+    glossEl.style.left = `${left + scrollX}px`;
+    glossEl.style.setProperty('--arrow', `${Math.round(clamp(r.left + r.width / 2 - left, 18, w - 18))}px`);
+    const h = glossEl.offsetHeight;
+    const top = Math.max(parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sa-top')) || 0, 12) + 8;
+    const above = r.top - h - 12 > top;
+    glossEl.classList.toggle('g-below', !above);
+    glossEl.style.top = `${(above ? r.top - h - 10 : r.bottom + 10) + scrollY}px`;
+  }
+  const onWordTap = e => {
+    const span = e.target.closest('.w');
+    if (!span || !span.closest('p')) return;
+    openGloss(span);
+  };
+  quizEls.card.addEventListener('click', onWordTap);
+  quizEls.explain.addEventListener('click', onWordTap);
+  document.addEventListener('pointerdown', e => {
+    if (glossEl.hidden || glossEl.contains(e.target) || e.target.closest('#qcard .w, #explain .w')) return;
+    closeGloss();
+  }, true);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeGloss(); });
+  // 画面の大きさが変わったら（向きを変えた・バーが出入りした）、閉じずに単語の位置へ置き直す
+  window.addEventListener('resize', () => { if (glossFor && glossFor.isConnected) placeGloss(glossFor); else closeGloss(); });
+
+  // 品詞の色分け：名詞・動詞・形容詞・副詞だけ色を変える（形容詞と副詞を見分けやすく）
+  function posTone(label) {
+    if (/^名詞/.test(label)) return 'n';
+    if (/^形容詞/.test(label)) return 'a';
+    if (/^副詞/.test(label)) return 'd';
+    if (/^(動詞|be動詞|助動詞|to不定詞|動名詞|現在分詞|過去分詞|現在完了|過去完了|未来完了|進行形|受動態|仮定法)/.test(label)) return 'v';
+    return 'o';
+  }
+  // 答えたあと、選択肢の下に品詞と意味を出す。文法は「品詞＋意味」、単語はそれぞれの選択肢の意味（英語なら日本語、日本語なら英語）
+  function annotateChoices(q, buttons) {
+    q.choices.forEach((choice, i) => {
+      let tag = null;
+      let text = null;
+      let lang = 'ja';
+      if (q.kind === 'grammar') {
+        if (!choice.note) return;
+        tag = choice.note.label;
+        text = choice.note.ja;
+      } else if (choice.word) {
+        text = q.choiceLang === 'en' ? choice.word.ja : choice.word.en;
+        lang = q.choiceLang === 'en' ? 'ja' : 'en';
+      }
+      if (!tag && !text) return;
+      const sub = make('span', 'ch-sub');
+      sub.lang = 'ja';
+      if (tag) sub.append(make('span', `ptag t-${posTone(tag)}`, tag));
+      if (text) {
+        const s = make('span', 'ch-text', text);
+        s.lang = lang;
+        sub.append(s);
+      }
+      buttons[i].querySelector('.txt').append(sub);
+      buttons[i].classList.add('ch-has');
+    });
+    const subs = quizEls.choices.querySelectorAll('.ch-sub');
+    if (subs.length && !calm()) gsap.from(subs, { opacity: 0, y: -4, duration: .3, ease: 'power2.out', stagger: .05, delay: .25, clearProps: 'opacity,transform' });
+  }
+
+  /* まちがえた問題は、同じ回の少しあと（3問あけて）にもう一度出す。単語は出し方を変えて同じ語、
+     文法は同じ分野で正解の品詞が同じ「類題」（なければ同じ問題を最後に）。実戦20問は本番の練習なので足さない。
+     1回に足すのは5問まで。足した問題をまちがえても、さらには足さない（その問題は復習に回る） */
+  function addFollowUp(q) {
+    const item = q.item;
+    if (round.drill || item.again || item.similar || item.followed || round.added >= 5) return null;
+    let next;
+    let at = Math.min(round.items.length, round.i + 4);
+    if (q.kind === 'grammar') {
+      const inRound = new Set(round.items.filter(it => it.type === 'grammar').map(it => it.g.id));
+      const sim = similarGrammar(q.g, inRound);
+      if (sim) next = { type: 'grammar', g: sim, similar: q.g.id };
+      else { next = { type: 'grammar', g: q.g, again: true, review: true }; at = round.items.length; }
+    } else {
+      next = { type: 'word', word: q.word, mode: q.kind === 'meaning' ? 'reverse' : 'meaning', again: true, review: true };
+    }
+    item.followed = true;
+    round.added++;
+    round.items.splice(at, 0, next);
+    return next;
+  }
+
   function renderQuestion(q) {
+    closeGloss();
     const card = quizEls.card;
     card.replaceChildren();
     card.append(make('span', `qtag${q.tagClass ? ` ${q.tagClass}` : ''}`, q.tag));
@@ -1353,8 +1697,17 @@
     mimi.setMood(q.kind === 'grammar' ? 'focus' : 'smile');
     mimi.lockGaze(quizEls.card);
     let line;
-    if (round.i === 0) line = q.kind === 'grammar' ? pick(LINES.start) : pick(LINES.startWords);
-    else if (q.kind === 'grammar') line = round.drill ? pick(['集中！', '落ち着いて。', 'いけるよ！', '前後をよく見て！']) : `ヒント：${CAT.get(q.g.cat).desc}`;
+    const hint = store.data.hint;
+    if (round.i === 0 && round.focus.length) line = `今日は苦手な「${round.focus[0].cat.name}」を多めにしたよ。`;
+    else if (round.i === 0) line = q.kind === 'grammar' ? pick(LINES.start) : pick(LINES.startWords);
+    else if (q.item.similar) line = `さっきと同じ「${CAT.get(q.g.cat).name}」の問題だよ。今度はいける！`;
+    else if (q.item.again) line = q.kind === 'grammar' ? 'さっきの問題、もう一度！' : 'さっきの単語、もう一度！';
+    else if (q.kind === 'grammar' && !hint.glossUsed && (hint.gloss || 0) < 2) {
+      // 単語をタップすると意味が出ることを、はじめの2回だけ伝える
+      hint.gloss = (hint.gloss || 0) + 1;
+      store.save();
+      line = 'わからない単語は、タップすると意味が出るよ。';
+    } else if (q.kind === 'grammar') line = round.drill ? pick(['集中！', '落ち着いて。', 'いけるよ！', '前後をよく見て！']) : `ヒント：${CAT.get(q.g.cat).desc}`;
     else line = { meaning: '意味はどれ？', reverse: '英語でいうと？', listen: 'よく聞いてね。', intro: 'まずは覚えよう！あとでテストするね。' }[q.kind];
     say(line);
     if (q.timed) startTimer(round.seconds);
@@ -1435,6 +1788,7 @@
     const q = round.q;
     if (!q || !q.choices) return;
     round.answered = true;
+    closeGloss();
     const elapsed = q.timed ? round.seconds - timer.left : (performance.now() - round.shownAt) / 1000;
     stopTimer();
     cancelSpeakLater(); // 問題の単語をまだ読んでいなければ、もう読まない
@@ -1450,6 +1804,17 @@
     day.q++;
     if (ok) day.ok++;
     if (q.kind === 'grammar') { day.g = (day.g || 0) + 1; updateBox(store.data.gram, q.g.id, ok, q.timed ? elapsed : null); } else { day.w = (day.w || 0) + 1; updateBox(store.data.words, q.word.id, ok); }
+    // 傾向の記録：文法は選んだ選択肢の番号、単語は選んだ語。取りちがえた語は覚えておき、次から選択肢に入れる
+    const chosen = index >= 0 ? q.choices[index] : null;
+    if (q.kind === 'grammar') logAnswer('g', q.g.id, ok, chosen ? chosen.oi : null);
+    else {
+      logAnswer('w', q.word.id, ok, chosen && chosen.word ? chosen.word.id : null);
+      if (!ok && chosen && chosen.word && chosen.word.id !== q.word.id) {
+        const s = store.data.words[q.word.id];
+        s.mix = [chosen.word.id, ...(s.mix || []).filter(id => id !== chosen.word.id)].slice(0, 3);
+      }
+    }
+    const follow = ok ? null : addFollowUp(q);
     touchStreak();
     let gain = ok ? 10 : 2;
     const fast = ok && q.timed && elapsed <= round.seconds / 2;
@@ -1500,10 +1865,13 @@
         buzz([18, 40, 18]);
         if (!calm()) gsap.fromTo(wrongBtn, { x: 0 }, { x: 9, duration: .4, ease: window.CustomWiggle ? 'errShake' : 'sine.inOut', clearProps: 'transform' });
         mimi.oops();
-        say(pick(LINES.wrong));
+        if (!follow) say(pick(LINES.wrong));
+        else if (follow.similar) say(pick(['だいじょうぶ。あとで同じ型の問題を出すね。', 'ここは大事！少しあとで似た問題を出すよ。']));
+        else say(pick(['だいじょうぶ。少しあとで、もう一度出すね。', 'おしい！あとでもう一度いこう。']));
       }
       if (!calm()) gsap.fromTo(rightBtn, { scale: 1 }, { scale: 1.03, duration: .22, yoyo: true, repeat: 3, ease: 'sine.inOut', delay: .35 });
     }
+    annotateChoices(q, buttons);
     renderExplain(q, { ok, timedOut, elapsed, gain, rightText: q.choices[rightIndex].text });
     showFoot(round.i === round.items.length - 1 ? '結果を見る' : 'つぎへ');
     readAfterAnswer(q, q.choices[rightIndex].text);
@@ -1540,10 +1908,7 @@
     box.append(verdict);
     if (q.kind === 'grammar') {
       const full = make('div', 'full');
-      const p = make('p');
-      p.lang = 'en';
-      const [before, after = ''] = q.g.q.split('-------');
-      p.append(before, make('b', null, rightText), after);
+      const p = filledSentence(q.g.q, rightText, q.g.notes[0] || null);
       full.append(p, sayButton(q.g.q.replace('-------', rightText), .9));
       const notes = make('dl', 'notes');
       notes.append(make('dt', null, 'ポイント'), make('dd', null, q.g.why), make('dt', null, '訳'), make('dd', null, q.g.ja));
@@ -1688,7 +2053,15 @@
     }
 
     // まちがえた問題は、開くと解説が読める
-    const missed = r.results.filter(x => !x.ok);
+    // 同じ問題を2回まちがえても（もう一度出したとき）、一覧には1つだけ出す
+    const missedKeys = new Set();
+    const missed = r.results.filter(x => {
+      if (x.ok) return false;
+      const key = x.q.kind === 'grammar' ? x.q.g.id : x.q.word.id;
+      if (missedKeys.has(key)) return false;
+      missedKeys.add(key);
+      return true;
+    });
     const list = $('result-missed');
     list.replaceChildren();
     if (missed.length) {
@@ -1723,8 +2096,14 @@
     $('result-retry').hidden = !missed.length;
     $('result-retry').onclick = () => startRound({
       title: 'まちがえた問題', kind: 'retry', seconds: r.seconds,
-      items: shuffle(missed.map(x => ({ ...x.item, type: x.item.type === 'intro' ? 'word' : x.item.type, fresh: false, review: true }))),
+      items: shuffle(missed.map(x => (x.q.kind === 'grammar'
+        ? { type: 'grammar', g: x.q.g, review: true }
+        : { type: 'word', word: x.q.word, review: true }))),
     });
+    // 次のレッスンで多めに出すもの（苦手の傾向から）
+    const next = focusText(weakFocus());
+    $('result-next').hidden = !next;
+    $('result-next-text').textContent = next ? `次のレッスンでは、${next}を多めに出すね。まちがえ方は「記録」で見られるよ。` : '';
 
     const tier = rate === 100 ? 'perfect' : rate >= 80 ? 'great' : rate >= 60 ? 'good' : 'keep';
     gsap.delayedCall(calm() ? 0 : .3, () => {
@@ -1760,7 +2139,7 @@
       ...interleave(p.nG.map(g => ({ type: 'grammar', g })), p.rG.map(g => ({ type: 'grammar', g, review: true }))),
       ...shuffle(p.nW).map(word => ({ type: 'word', word, fresh: true })),
     ];
-    startRound({ title: '今日のレッスン', kind: 'daily', items });
+    startRound({ title: '今日のレッスン', kind: 'daily', items, focus: p.nG.length ? p.focus : [] });
   }
   function startReview() {
     const items = interleave(dueGrammar().map(g => ({ type: 'grammar', g, review: true })), dueWords().map(word => ({ type: 'word', word, review: true }))).slice(0, 20);
@@ -1773,13 +2152,15 @@
     startRound({ title: '文法の復習', kind: 'review', items });
   }
   function startDrill() {
-    const items = shuffle(nextGrammar(20)).map(g => ({ type: 'grammar', g }));
+    const items = shuffle(nextGrammar(20, new Set(), undefined, { adaptive: false })).map(g => ({ type: 'grammar', g }));
     startRound({ title: '実戦20問', kind: 'drill', items, seconds: timerSec() || 20, drill: true });
   }
   function startCatQuiz(catId) {
     const map = store.data.gram;
     const list = GRAMMAR.filter(g => g.cat === catId);
-    const unseen = list.filter(g => !map[g.id]);
+    // まちがえ方で多い「正解の品詞」の問題を先に（副詞の所で形容詞を選びがちなら、副詞が入る問題から）
+    const aims = aimsByCat();
+    const unseen = list.filter(g => !map[g.id]).sort((a, b) => aimHit(b, aims) - aimHit(a, aims));
     const wrong = list.filter(g => map[g.id] && map[g.id].last === 0);
     const rest = list.filter(g => map[g.id] && map[g.id].last === 1).sort((a, b) => map[a.id].at - map[b.id].at);
     const items = [...unseen, ...wrong, ...rest].slice(0, 10).map(g => ({ type: 'grammar', g }));
@@ -2113,6 +2494,7 @@
     const now = new Date();
     calMonth = { y: now.getFullYear(), m: now.getMonth() };
     renderCalendar();
+    renderWeak();
 
     const cats = $('records-cats');
     cats.replaceChildren();
@@ -2150,6 +2532,73 @@
     $('about-version').textContent = `バージョン ${VERSION} ・ 単語 ${WORDS.length}語 ・ 文法 ${GRAMMAR.length}問`;
     renderExportLast();
     renderInstall();
+  }
+  // 苦手の傾向：いまの力が低い分野・まちがえ方・まちがえやすい単語。ここに出ているものを、次のレッスンで多めに出す
+  function renderWeak() {
+    const box = $('records-weak');
+    box.replaceChildren();
+    const focus = weakFocus();
+    const conf = confusions().slice(0, 4);
+    const words = weakWords(5);
+    if (!focus.length && !conf.length && !words.length) {
+      box.append(make('p', 'empty', 'まだ目立つ苦手はありません。問題を解くと、まちがえ方の傾向がここにまとまります。'));
+      return;
+    }
+    const lead = make('p', 'weak-lead');
+    lead.textContent = focus.length
+      ? `次のレッスンでは、${focusText(focus)}を多めに出します。まちがえた問題は、同じ回の少しあとにもう一度（文法は類題で）出します。`
+      : 'まちがえた問題は、同じ回の少しあとにもう一度（文法は類題で）出します。';
+    box.append(lead);
+    if (focus.length) {
+      box.append(make('h3', 'weak-h', '力をつけたい分野'));
+      focus.forEach(x => {
+        const row = make('div', 'catbar');
+        const bar = make('i', 'bar bad');
+        const fill = make('i');
+        bar.append(fill);
+        // 右の数字は「いまの力」（最近の答えを重く見た正答率）。下の小さい字は直近の結果そのもの
+        const name = make('span', null, x.cat.name);
+        if (x.rn) name.append(make('small', null, `直近${x.rn}問で${x.rok}問正解`));
+        row.append(name, bar, make('b', null, `${Math.round(x.acc * 100)}%`));
+        box.append(row);
+        setBar(fill, x.acc, .8, .2);
+      });
+    }
+    if (conf.length) {
+      box.append(make('h3', 'weak-h', 'まちがえ方（最近3週間）'));
+      const ul = make('ul', 'weak-list');
+      conf.forEach(c => {
+        const li = make('li');
+        const text = make('span');
+        text.append(make('span', `ptag t-${posTone(c.right)}`, c.right), ' が入る所で ', make('span', `ptag t-${posTone(c.chose)}`, c.chose), ' を選んだ');
+        text.append(make('small', null, CAT.get(c.cat).name));
+        li.append(text, make('b', null, `${c.n}回`));
+        ul.append(li);
+      });
+      box.append(ul);
+    }
+    if (words.length) {
+      box.append(make('h3', 'weak-h', 'まちがえやすい単語'));
+      const ul = make('ul', 'weak-list');
+      words.forEach(w => {
+        const s = store.data.words[w.id];
+        const li = make('li');
+        const text = make('span');
+        const en = make('b', 'weak-en', w.en);
+        en.lang = 'en';
+        text.append(en, `　${w.ja}`);
+        const partner = s.mix && WORD.get(s.mix[0]);
+        if (partner) {
+          const small = make('small', null, 'まちがえた相手：');
+          const p = make('span', null, `${partner.en}（${partner.ja}）`);
+          small.append(p);
+          text.append(small);
+        }
+        li.append(text, make('b', null, `${s.n - s.ok}回`));
+        ul.append(li);
+      });
+      box.append(ul);
+    }
   }
   function renderExportLast() {
     const at = store.data.lastExport;
@@ -2451,6 +2900,17 @@
       startDaily, startDrill, startCatQuiz, startCards, openLesson, goHome, openWords, openGrammar, openRecords,
       answer: i => answer(i), rightIndex: () => round?.q?.choices?.findIndex(c => c.right) ?? -1,
       next: () => quizEls.next.click(), currentRound: () => round, currentScreen: () => current, deck: () => deck,
+      catSkills, confusions, weakFocus, weakWords, nextGrammar, similarGrammar, openGloss, closeGloss,
+      // 文法の文の単語で、意味（gloss.js）がないもの。選択肢の注（grammar-notes.js）が4つそろっていない問題
+      glossMissing: () => {
+        const missing = new Set();
+        for (const g of GRAMMAR) {
+          const spans = [...sentenceNode(g.q).querySelectorAll('.w, .blank')];
+          spans.forEach((s, i) => { if (s.classList.contains('w') && cleanWord(s.textContent) && !lookUpWord(spans, i)) missing.add(`${g.id}:${s.textContent}`); });
+        }
+        return [...missing];
+      },
+      notesMissing: () => GRAMMAR.filter(g => g.notes.length !== g.opts.length).map(g => g.id),
     });
   }
 })();

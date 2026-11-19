@@ -64,6 +64,8 @@
   --warn-text: #a85500; /* 残り時間の数字。地との差を 4.5:1 以上に */
   --pink: #f2638b;
   --tie: #3a4bd6;
+  /* 品詞の札の色（名詞・動詞・形容詞・副詞）。白い地で 4.5:1 以上 */
+  --pos-n: #2c3bb5; --pos-v: #7a3fc4; --pos-a: #855600; --pos-d: #0b6a74;
   --shadow: 0 1px 0 rgba(47, 39, 71, .05), 0 12px 30px -18px rgba(47, 39, 71, .35);
   --blob-1: #ffd7a6;
   --blob-2: #c7cfff;
@@ -88,6 +90,7 @@
     --good: #47d3a0; --good-soft: #163c31; --good-text: #82e7c2; --on-good: #062418;
     --bad: #ff8a77; --bad-soft: #44231f; --bad-text: #ffb4a8; --on-bad: #2f0b06;
     --warn: #ffab4a; --warn-text: #ffb760; --pink: #ff86a8; --tie: #5b6cf2;
+    --pos-n: #b8c0ff; --pos-v: #d2b8ff; --pos-a: #ffd67c; --pos-d: #86dde5;
     --shadow: 0 1px 0 rgba(0, 0, 0, .25), 0 16px 34px -20px rgba(0, 0, 0, .8);
     --blob-1: #4a3a6a; --blob-2: #22356f; --blob-3: #5b2e50;
     color-scheme: dark;
@@ -101,6 +104,7 @@
   --good: #47d3a0; --good-soft: #163c31; --good-text: #82e7c2; --on-good: #062418;
   --bad: #ff8a77; --bad-soft: #44231f; --bad-text: #ffb4a8; --on-bad: #2f0b06;
   --warn: #ffab4a; --warn-text: #ffb760; --pink: #ff86a8; --tie: #5b6cf2;
+  --pos-n: #b8c0ff; --pos-v: #d2b8ff; --pos-a: #ffd67c; --pos-d: #86dde5;
   --shadow: 0 1px 0 rgba(0, 0, 0, .25), 0 16px 34px -20px rgba(0, 0, 0, .8);
   --blob-1: #4a3a6a; --blob-2: #22356f; --blob-3: #5b2e50;
   color-scheme: dark;
@@ -283,6 +287,7 @@ html.bars-themed .tabs { background: var(--bg); -webkit-backdrop-filter: none; b
 .today-sub { font-size: .88rem; opacity: .9; margin-top: 2px; }
 .today-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 .today-chips span { padding: 3px 10px; border-radius: 99px; background: rgba(255, 255, 255, .18); font-size: .8rem; font-weight: 700; }
+.today-chips .chip-focus { background: var(--sun); color: #3d2a00; } /* 苦手な分野を多めにしているとき */
 .today-go { grid-column: 1 / -1; width: 100%; }
 .ring { position: relative; width: 86px; height: 86px; }
 .ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
@@ -443,6 +448,40 @@ html.bars-themed .tabs { background: var(--bg); -webkit-backdrop-filter: none; b
 .notes dt { font-size: .74rem; font-weight: 800; color: var(--accent-text); background: var(--accent-soft); border-radius: 7px; padding: 2px 7px; height: fit-content; margin-top: 2px; white-space: nowrap; }
 .notes dd { line-height: 1.65; }
 
+/* 答えたあと、選択肢の下に出す段（ch-）：文法は品詞の札と意味、単語はその選択肢の意味 */
+.choice .txt { min-width: 0; }
+.ch-sub { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-top: 5px; font: 700 .8rem/1.45 var(--sans); color: var(--muted); }
+.choice.is-right .ch-sub, .choice.is-wrong .ch-sub { color: inherit; }
+.ch-text[lang="en"] { font-family: var(--en); font-size: .92rem; }
+.choice.ch-has.is-dim { opacity: .72; } /* ほかの選択肢の品詞も読めるように、薄くしすぎない */
+/* 品詞の札。名詞・動詞・形容詞・副詞だけ色を変えて、形容詞と副詞を見分けやすくする */
+.ptag { display: inline-block; padding: 0 7px; border-radius: 7px; background: var(--surface); box-shadow: inset 0 0 0 1.5px currentColor; color: var(--muted); font: 800 .72rem/1.6 var(--sans); white-space: nowrap; }
+.ptag.t-n { color: var(--pos-n); }
+.ptag.t-v { color: var(--pos-v); }
+.ptag.t-a { color: var(--pos-a); }
+.ptag.t-d { color: var(--pos-d); }
+
+/* 単語の意味の吹き出し（gloss）。問題文と解説の文の単語をタップすると出る */
+#qcard .qtext .w, #explain .full > p .w { cursor: pointer; border-radius: 5px; transition: background-color .15s; }
+.w.g-ph { background: var(--sun-soft); box-shadow: 0 2px 0 0 var(--sun); }
+.w.g-on { background: var(--accent-soft); box-shadow: 0 2px 0 0 var(--accent); }
+.gloss {
+  position: absolute; z-index: 16; padding: 12px 14px; border-radius: 16px;
+  background: var(--surface); color: var(--text); font-size: .92rem; line-height: 1.55;
+  box-shadow: 0 14px 34px -12px rgba(20, 20, 50, .45), inset 0 0 0 1.5px var(--line);
+}
+.gloss::after { content: ""; position: absolute; left: var(--arrow, 50%); bottom: -7px; width: 14px; height: 14px; margin-left: -7px; background: var(--surface); box-shadow: 1.5px 1.5px 0 0 var(--line); transform: rotate(45deg); }
+.gloss.g-below::after { bottom: auto; top: -7px; box-shadow: -1.5px -1.5px 0 0 var(--line); }
+.gloss > * + * { margin-top: 6px; }
+.gloss-head { display: flex; align-items: baseline; gap: 4px 10px; flex-wrap: wrap; }
+.gloss-head b { font: 800 1.15rem var(--en); }
+.gloss-head small { color: var(--muted); font-size: .78rem; font-weight: 700; }
+.gloss-ja { display: flex; align-items: baseline; gap: 8px; font-weight: 700; }
+.gloss-ja .ptag { flex: none; }
+.gloss-ph { padding: 6px 10px; border-radius: 10px; background: var(--sun-soft); font-size: .88rem; }
+.gloss-ph b { margin-right: 8px; font-family: var(--en); color: var(--sun-text); }
+.gloss-own { color: var(--muted); font-size: .78rem; font-weight: 700; }
+
 .foot {
   position: fixed; inset: auto 0 0; z-index: 15;
   padding: 18px var(--gut-r) calc(12px + var(--sa-bottom)) var(--gut-l);
@@ -535,6 +574,16 @@ html.bars-themed .tabs { background: var(--bg); -webkit-backdrop-filter: none; b
 .catbar { display: grid; grid-template-columns: 8.6em minmax(0, 1fr) 3.2em; gap: 10px; align-items: center; font-size: .86rem; font-weight: 700; }
 .catbar + .catbar { margin-top: 8px; }
 .catbar b { font: 700 .8rem var(--en); color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+.catbar span small { display: block; color: var(--muted); font-size: .72rem; font-weight: 600; line-height: 1.3; }
+.bar.bad i { background: var(--bad); }
+/* 記録の「苦手の傾向」（weak-） */
+.weak-lead { color: var(--muted); font-size: .88rem; font-weight: 600; }
+.weak-h { margin: 16px 0 8px; font-size: .86rem; font-weight: 800; }
+.weak-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); font-size: .88rem; font-weight: 700; line-height: 1.7; }
+.weak-list li:first-child { border-top: 0; padding-top: 2px; }
+.weak-list small { display: block; color: var(--muted); font-size: .75rem; font-weight: 600; line-height: 1.4; }
+.weak-list li > b { font: 700 .85rem var(--en); color: var(--bad-text); font-variant-numeric: tabular-nums; }
+.weak-en { font: 800 1rem var(--en); }
 .hist li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); font-size: .9rem; }
 .hist li:first-child { border-top: 0; }
 .hist small { color: var(--faint); display: block; font-size: .75rem; }
@@ -869,6 +918,10 @@ html.calm *, html.calm *::before, html.calm *::after { transition-duration: .01s
           <i class="bar sun"><i id="result-xpbar"></i></i>
         </div>
         <section class="missed rise" id="result-missed"></section>
+        <div class="tip rise" id="result-next" hidden>
+          <svg class="icon"><use href="#i-bulb"/></svg>
+          <div><b>次のレッスン</b><p id="result-next-text"></p></div>
+        </div>
         <div class="result-actions rise">
           <button class="btn ghost" id="result-retry" type="button">まちがえた問題をもう一度</button>
           <button class="btn" id="result-home" type="button">ホームへ</button>
@@ -893,6 +946,7 @@ html.calm *, html.calm *::before, html.calm *::after { transition-duration: .01s
       <div class="cal" id="records-cal"></div>
       <p class="cal-note" id="cal-note"></p>
     </section>
+    <section class="card rise"><h2>苦手の傾向</h2><div id="records-weak"></div></section>
     <section class="card rise"><h2>分野ごとの正答率</h2><div id="records-cats"></div></section>
     <section class="card rise"><h2>最近の記録</h2><ul class="hist" id="records-hist"></ul></section>
     <section class="card rise" id="settings">
@@ -982,6 +1036,8 @@ html.calm *, html.calm *::before, html.calm *::after { transition-duration: .01s
 <script src="vendor/gsap/CustomWiggle.min.js"></script>
 <script src="js/words.js"></script>
 <script src="js/grammar.js"></script>
+<script src="js/grammar-notes.js"></script>
+<script src="js/gloss.js"></script>
 <script src="js/lines.js"></script>
 <script src="voice/index.js"></script>
 <script src="js/mimi.js"></script>
