@@ -8,7 +8,7 @@
   const hasDraw = Boolean(window.DrawSVGPlugin);
   const hasPhysics = Boolean(window.Physics2DPlugin);
   if (window.CustomWiggle) window.CustomWiggle.create('errShake', { wiggles: 3, type: 'easeOut' });
-  const VERSION = '1.6.3';
+  const VERSION = '1.6.4';
   const NS = 'http://www.w3.org/2000/svg';
 
   const LINES = window.MIMI_LINES;
@@ -1956,7 +1956,7 @@
     });
   }
 
-  // rise：下からせり上がって出す（答えたあとの「つぎへ」）。「覚えた！」はその場に出すだけ
+  // rise：下からふわっと出す（答えたあとの「つぎへ」）。解説と同じ動きで、はねさせない。「覚えた！」はその場に出すだけ
   // again：「まだ…」も並べる（新しい単語のカードのとき）
   function showFoot(label, { rise = true, again = false } = {}) {
     const foot = quizEls.foot;
@@ -1964,7 +1964,13 @@
     $('quiz-again').hidden = !again;
     if (!foot.hidden) return;
     foot.hidden = false;
-    if (rise && !calm()) gsap.fromTo(quizEls.next, { y: 70, opacity: 0 }, { y: 0, opacity: 1, duration: .45, ease: 'back.out(1.6)', delay: .15, clearProps: 'transform,opacity' });
+    if (rise && !calm()) {
+      const soft = { duration: .42, ease: 'power3.out', delay: .12, overwrite: true };
+      // 下の帯ごと薄く出し、ボタンは少しだけ持ち上げる。.btn のばねの transition が重ならないよう、動く間は止める
+      quizEls.next.style.transition = 'none';
+      gsap.fromTo(foot, { opacity: 0 }, { opacity: 1, ...soft, clearProps: 'opacity' });
+      gsap.fromTo(quizEls.next, { y: 22 }, { y: 0, ...soft, clearProps: 'transform,transition' });
+    }
     setTimeout(() => { if (!foot.hidden) quizEls.next.focus({ preventScroll: true }); }, 250);
   }
   function hideFoot() { quizEls.foot.hidden = true; $('quiz-again').hidden = true; }
