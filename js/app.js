@@ -8,7 +8,7 @@
   const hasDraw = Boolean(window.DrawSVGPlugin);
   const hasPhysics = Boolean(window.Physics2DPlugin);
   if (window.CustomWiggle) window.CustomWiggle.create('errShake', { wiggles: 3, type: 'easeOut' });
-  const VERSION = '1.6.2';
+  const VERSION = '1.6.3';
   const NS = 'http://www.w3.org/2000/svg';
 
   const LINES = window.MIMI_LINES;
@@ -668,6 +668,8 @@
     const misses = s.n - s.ok;
     const shrink = misses >= 4 ? .4 : misses >= 2 ? .6 : 1;
     s.d = t + (ok ? Math.max(1, Math.round(INTERVAL[s.b] * shrink)) : 0);
+    // 「まだ…」と言った単語は、1回正解しても、その日の復習にもう一度出す
+    if (ok && s.hold) { s.hold = 0; s.d = t; }
     s.last = ok ? 1 : 0;
     s.at = Date.now();
     if (time != null) s.t = Math.round(time * 10) / 10;
@@ -1333,7 +1335,7 @@
     return pick(modes);
   }
   function buildQuestion(item) {
-    if (item.type === 'intro') return { kind: 'intro', item, word: item.word, tag: '新しい単語', tagClass: 'sun' };
+    if (item.type === 'intro') return { kind: 'intro', item, word: item.word, tag: item.again ? 'もう一度 ・ 新しい単語' : '新しい単語', tagClass: 'sun' };
     if (item.type === 'grammar') {
       const g = item.g;
       const name = CAT.get(g.cat).name;
@@ -1712,6 +1714,7 @@
     if (round.i === 0 && round.focus.length) line = `今日は苦手な「${round.focus[0].cat.name}」を多めにしたよ。`;
     else if (round.i === 0) line = q.kind === 'grammar' ? pick(LINES.start) : pick(LINES.startWords);
     else if (q.item.similar) line = `さっきと同じ「${CAT.get(q.g.cat).name}」の問題だよ。今度はいける！`;
+    else if (q.item.again && q.kind === 'intro') line = 'さっきの単語、もう一度見ておこう。';
     else if (q.item.again) line = q.kind === 'grammar' ? 'さっきの問題、もう一度！' : 'さっきの単語、もう一度！';
     else if (q.kind === 'grammar' && !hint.glossUsed && (hint.gloss || 0) < 2) {
       // 単語をタップすると意味が出ることを、はじめの2回だけ伝える
@@ -1726,7 +1729,7 @@
     if (store.data.settings.speak && ['meaning', 'intro', 'listen'].includes(q.kind)) {
       speakLater(afterTalk(.35), () => { if (round && round.q === q && !round.answered) speakWith(quizEls.card.querySelector('.say-btn'), q.word.en, .85); });
     }
-    if (q.kind === 'intro') showFoot('覚えた！', { rise: false });
+    if (q.kind === 'intro') showFoot('覚えた！', { rise: false, again: true });
   }
 
   /* タイマー：線形で減る輪（時間は均等に流れるので、ここだけは linear） */
@@ -1954,32 +1957,53 @@
   }
 
   // rise：下からせり上がって出す（答えたあとの「つぎへ」）。「覚えた！」はその場に出すだけ
-  function showFoot(label, { rise = true } = {}) {
+  // again：「まだ…」も並べる（新しい単語のカードのとき）
+  function showFoot(label, { rise = true, again = false } = {}) {
     const foot = quizEls.foot;
     $('quiz-next-label').textContent = label;
+    $('quiz-again').hidden = !again;
     if (!foot.hidden) return;
     foot.hidden = false;
     if (rise && !calm()) gsap.fromTo(quizEls.next, { y: 70, opacity: 0 }, { y: 0, opacity: 1, duration: .45, ease: 'back.out(1.6)', delay: .15, clearProps: 'transform,opacity' });
     setTimeout(() => { if (!foot.hidden) quizEls.next.focus({ preventScroll: true }); }, 250);
   }
-  function hideFoot() { quizEls.foot.hidden = true; }
+  function hideFoot() { quizEls.foot.hidden = true; $('quiz-again').hidden = true; }
 
+  // 新しい単語を見た：今日のうちにテストで確かめる。
+  // unsure（「まだ…」）なら、同じ回の少しあと（3枚あけて）にもう一度カードを見せ、
+  // テストで1回正解しても、その日の「苦手を復習」にもう一度出す（hold）
+  function learnIntro(q, unsure) {
+    const t = dayNo();
+    const map = store.data.words;
+    const s = map[q.word.id] || (map[q.word.id] = { b: 0, d: t, n: 0, ok: 0 });
+    if (unsure) {
+      s.b = 0;
+      s.d = t;
+      s.hold = 1;
+      if (!q.item.again) round.items.splice(Math.min(round.items.length, round.i + 4), 0, { type: 'intro', word: q.word, again: true });
+    }
+    if (!q.item.again) {
+      const day = dayStat();
+      day.c = (day.c || 0) + 1;
+    }
+    touchStreak();
+    store.save();
+    if (unsure) mimi.setMood('gentle', { after: .8, then: 'smile' }); else mimi.hop(10);
+    setBar($('quiz-bar'), (round.i + 1) / round.items.length, .5);
+    hush();
+    nextQuestion();
+  }
   quizEls.next.addEventListener('click', () => {
     if (!round || round.busy) return;
     const q = round.q;
-    if (q && q.kind === 'intro') {
-      // 新しい単語を見た：今日のうちにテストで確かめる
-      const t = dayNo();
-      if (!store.data.words[q.word.id]) store.data.words[q.word.id] = { b: 0, d: t, n: 0, ok: 0 };
-      const day = dayStat();
-      day.c = (day.c || 0) + 1;
-      touchStreak();
-      store.save();
-      mimi.hop(10);
-      setBar($('quiz-bar'), (round.i + 1) / round.items.length, .5);
-    } else if (q && !round.answered) return;
+    if (q && q.kind === 'intro') { learnIntro(q, false); return; }
+    if (q && !round.answered) return;
     hush();
     nextQuestion();
+  });
+  $('quiz-again').addEventListener('click', () => {
+    if (!round || round.busy || !round.q || round.q.kind !== 'intro') return;
+    learnIntro(round.q, true);
   });
   // やめる（×ボタンと Android の戻るボタン）。1問も答えていなければ、そのままホームへ
   async function askQuit() {
@@ -2351,8 +2375,8 @@
       else if (s.b < 1) { s.b = 1; s.d = t + 1; }
       deck.know++;
     } else {
-      if (!s) map[w.id] = { b: 0, d: t, n: 0, ok: 0 };
-      else { s.b = 0; s.d = t; }
+      if (!s) map[w.id] = { b: 0, d: t, n: 0, ok: 0, hold: 1 };
+      else { s.b = 0; s.d = t; s.hold = 1; }
       deck.again.push(w);
     }
     const day = dayStat();
