@@ -8,7 +8,7 @@
   const hasDraw = Boolean(window.DrawSVGPlugin);
   const hasPhysics = Boolean(window.Physics2DPlugin);
   if (window.CustomWiggle) window.CustomWiggle.create('errShake', { wiggles: 3, type: 'easeOut' });
-  const VERSION = '1.6.5';
+  const VERSION = '1.6.6';
   const NS = 'http://www.w3.org/2000/svg';
 
   const LINES = window.MIMI_LINES;
@@ -31,11 +31,13 @@
   };
   // 品詞のまとまり：かっこの中を外し、「・」の前だけを見る（「動詞（過去形・過去分詞）」→「動詞」）
   const posClass = label => label.replace(/（[^）]*）/g, '').split('・')[0].trim();
+  // まちがいの選択肢がなぜダメか（js/grammar-why.js）。選択肢の2つ目から順に3つ
+  const OPT_WHY = window.TOEIC_OPT_WHY || {};
   const GRAMMAR = CATS.flatMap(cat => (window.TOEIC_GRAMMAR[cat.id] || [])
     .map(([q, opts, ja, why], i) => {
       const id = `${cat.id}-${i + 1}`;
       const notes = (OPT_NOTES[id] || []).map(parseNote);
-      return { id, cat: cat.id, q, opts, ja, why, notes, rightClass: notes[0] ? posClass(notes[0].label) : '' };
+      return { id, cat: cat.id, q, opts, ja, why, notes, whyNot: OPT_WHY[id] || [], rightClass: notes[0] ? posClass(notes[0].label) : '' };
     }));
   const GMAP = new Map(GRAMMAR.map(g => [g.id, g]));
   // 問題文の単語の意味（js/gloss.js）
@@ -1886,7 +1888,7 @@
       if (!calm()) gsap.fromTo(rightBtn, { scale: 1 }, { scale: 1.03, duration: .22, yoyo: true, repeat: 3, ease: 'sine.inOut', delay: .35 });
     }
     annotateChoices(q, buttons);
-    renderExplain(q, { ok, timedOut, elapsed, gain, rightText: q.choices[rightIndex].text });
+    renderExplain(q, { ok, timedOut, elapsed, gain, rightText: q.choices[rightIndex].text, chosen: timedOut ? null : chosen });
     showFoot(round.i === round.items.length - 1 ? '結果を見る' : 'つぎへ');
     readAfterAnswer(q, q.choices[rightIndex].text);
   }
@@ -1909,7 +1911,28 @@
     });
   }
 
-  function renderExplain(q, { ok, timedOut, elapsed, gain, rightText }) {
+  // 文法の選択肢1つと、それがなぜダメか（grammar-why.js）。oi は grammar.js の並びでの番号（0が正解）
+  function optWhy(g, oi) {
+    const why = g.whyNot[oi - 1];
+    if (!why) return null;
+    const row = make('span', 'opt-why');
+    const word = make('b', null, g.opts[oi]);
+    word.lang = 'en';
+    row.append(word, why);
+    return row;
+  }
+  // 単語でまちがえたとき：選んだ選択肢が、本当はどの語（の意味）か
+  function wordMixNote(q, chosenWord) {
+    const p = make('span');
+    const en = make('b', null, chosenWord.en);
+    en.lang = 'en';
+    if (q.choiceLang === 'en') p.append(en, `（${POS_JA[chosenWord.pos]}）は「${chosenWord.ja}」という意味。`);
+    else p.append(`「${chosenWord.ja}」は `, en, `（${POS_JA[chosenWord.pos]}）の意味。`);
+    return p;
+  }
+
+  // 答えたあとの解説。まちがえたときは、選んだ答えがなぜダメかを先に出す（文法は、ほかの選択肢の理由も短く）
+  function renderExplain(q, { ok, timedOut, elapsed, gain, rightText, chosen = null }) {
     const box = make('div', `explain${ok ? '' : ' ng'}`);
     const verdict = make('div', 'verdict');
     verdict.append(make('b', null, ok ? '正解！' : timedOut ? '時間切れ' : '不正解'));
@@ -1921,11 +1944,27 @@
     verdict.append(make('span', 'xp', `+${gain} XP`));
     box.append(verdict);
     if (q.kind === 'grammar') {
+      const g = q.g;
       const full = make('div', 'full');
-      const p = filledSentence(q.g.q, rightText, q.g.notes[0] || null);
-      full.append(p, sayButton(q.g.q.replace('-------', rightText), .9));
+      const p = filledSentence(g.q, rightText, g.notes[0] || null);
+      full.append(p, sayButton(g.q.replace('-------', rightText), .9));
       const notes = make('dl', 'notes');
-      notes.append(make('dt', null, 'ポイント'), make('dd', null, q.g.why), make('dt', null, '訳'), make('dd', null, q.g.ja));
+      const mine = !ok && chosen && !chosen.right ? chosen.oi : null;
+      const mineRow = mine != null ? optWhy(g, mine) : null;
+      if (mineRow) {
+        const dd = make('dd', 'mine');
+        dd.append(mineRow);
+        notes.append(make('dt', 'mine', 'あなたの答え'), dd);
+      }
+      notes.append(make('dt', null, ok ? 'ポイント' : '正解の理由'), make('dd', null, g.why));
+      // ほかの選択肢は、画面の並び順で（選んだものは上に出したので除く）
+      const others = q.choices.filter(c => !c.right && c.oi !== mine).map(c => optWhy(g, c.oi)).filter(Boolean);
+      if (others.length) {
+        const dd = make('dd', 'others');
+        dd.append(...others);
+        notes.append(make('dt', null, 'ほかの選択肢'), dd);
+      }
+      notes.append(make('dt', null, '訳'), make('dd', null, g.ja));
       box.append(full, notes);
     } else {
       const w = q.word;
@@ -1936,12 +1975,20 @@
       head.append(en, `（${POS_JA[w.pos]}）　${w.ja}`);
       head.style.fontFamily = 'var(--sans)';
       full.append(head, sayButton(w.en, .85));
+      box.append(full);
+      if (!ok && chosen && chosen.word && chosen.word.id !== w.id) {
+        const notes = make('dl', 'notes');
+        const dd = make('dd', 'mine');
+        dd.append(wordMixNote(q, chosen.word));
+        notes.append(make('dt', 'mine', 'あなたの答え'), dd);
+        box.append(notes);
+      }
       const ex = make('div', 'ex');
       ex.append(exampleNode(w), make('p', null, w.exJa));
       const exRow = make('div', 'full');
       ex.style.flex = '1';
       exRow.append(ex, sayButton(w.ex, .9));
-      box.append(full, exRow);
+      box.append(exRow);
     }
     quizEls.explain.replaceChildren(box);
     if (!calm()) {
@@ -2104,26 +2151,58 @@
     list.replaceChildren();
     if (missed.length) {
       list.append(make('h2', 'sec-title', `まちがえた問題（${missed.length}）`));
+      // 1問ごとに「あなたの答え」と「正解」を並べる。開くと、選んだ答えがなぜダメかと解説が読める
+      const answerLines = (mineText, rightText, lang) => {
+        const box = make('span', 'ans');
+        box.lang = 'ja';
+        const mine = make('small', 'mine');
+        mine.append('あなたの答え：');
+        const m = make('b', null, mineText);
+        if (lang && mineText !== '時間切れ') m.lang = lang;
+        mine.append(m);
+        const right = make('small');
+        right.append('正解：');
+        const r = make('b', null, rightText);
+        if (lang) r.lang = lang;
+        right.append(r);
+        box.append(mine, right);
+        return box;
+      };
       missed.forEach(x => {
         const det = make('details');
         const sum = make('summary');
+        const chosen = x.timedOut || x.chosen < 0 ? null : x.q.choices[x.chosen];
+        const right = x.q.choices.find(c => c.right);
         if (x.q.kind === 'grammar') {
+          const g = x.q.g;
           sum.lang = 'en';
-          sum.append(x.q.g.q);
-          const right = make('small', null, `正解：${x.q.g.opts[0]}`);
-          right.lang = 'ja';
-          sum.append(right);
-          const why = make('p', null, x.q.g.why);
-          const ja = make('p', null, `訳：${x.q.g.ja}`);
-          det.append(sum, why, ja);
+          sum.append(g.q, answerLines(chosen ? chosen.text : '時間切れ', right.text, 'en'));
+          det.append(sum);
+          const row = chosen ? optWhy(g, chosen.oi) : null;
+          if (row) {
+            const p = make('p', 'mine');
+            p.append(row);
+            det.append(p);
+          }
+          det.append(make('p', null, `正解の理由：${g.why}`), make('p', null, `訳：${g.ja}`));
         } else {
           const w = x.q.word;
-          sum.append(w.en);
-          sum.lang = 'en';
-          const right = make('small', null, `${POS_JA[w.pos]}　${w.ja}`);
-          right.lang = 'ja';
-          sum.append(right);
-          det.append(sum, exampleNode(w), make('p', null, w.exJa));
+          // 問題に出した形（日本語から選んだときは日本語）で見せる
+          const reverse = x.q.choiceLang === 'en';
+          const head = make('span', null, reverse ? w.ja : w.en);
+          head.lang = reverse ? 'ja' : 'en';
+          sum.append(head, answerLines(chosen ? chosen.text : '時間切れ', right.text, reverse ? 'en' : 'ja'));
+          det.append(sum);
+          if (chosen && chosen.word && chosen.word.id !== w.id) {
+            const p = make('p', 'mine');
+            p.append(wordMixNote(x.q, chosen.word));
+            det.append(p);
+          }
+          const line = make('p');
+          const en = make('b', null, w.en);
+          en.lang = 'en';
+          line.append(en, `（${POS_JA[w.pos]}）　${w.ja}`);
+          det.append(line, exampleNode(w), make('p', null, w.exJa));
         }
         list.append(det);
       });
@@ -3017,7 +3096,7 @@
     window.__TOEIC_HOOK__({
       store, mimi, sound, WORDS, GRAMMAR, SETS, CATS, composeDaily, levelInfo, wordChoices, overlaps, senses,
       startDaily, startDrill, startCatQuiz, startCards, openLesson, goHome, openWords, openGrammar, openRecords,
-      answer: i => answer(i), rightIndex: () => round?.q?.choices?.findIndex(c => c.right) ?? -1,
+      answer: (i, timedOut) => answer(i, timedOut), rightIndex: () => round?.q?.choices?.findIndex(c => c.right) ?? -1,
       next: () => quizEls.next.click(), currentRound: () => round, currentScreen: () => current, deck: () => deck,
       catSkills, confusions, weakFocus, weakWords, nextGrammar, similarGrammar, openGloss, closeGloss,
       // 文法の文の単語で、意味（gloss.js）がないもの。選択肢の注（grammar-notes.js）が4つそろっていない問題
@@ -3036,6 +3115,8 @@
       },
       exampleNode,
       notesMissing: () => GRAMMAR.filter(g => g.notes.length !== g.opts.length).map(g => g.id),
+      // まちがいの選択肢の理由（grammar-why.js）が3つそろっていない問題
+      whyMissing: () => GRAMMAR.filter(g => g.whyNot.filter(Boolean).length !== g.opts.length - 1).map(g => g.id),
     });
   }
 })();

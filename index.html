@@ -447,6 +447,13 @@ html.bars-themed .tabs { background: var(--bg); -webkit-backdrop-filter: none; b
 .notes { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 10px; font-size: .94rem; }
 .notes dt { font-size: .74rem; font-weight: 800; color: var(--accent-text); background: var(--accent-soft); border-radius: 7px; padding: 2px 7px; height: fit-content; margin-top: 2px; white-space: nowrap; }
 .notes dd { line-height: 1.65; }
+/* まちがえたとき：選んだ答えがなぜダメか（赤）と、ほかの選択肢の理由（1つずつ1行） */
+.notes dt { justify-self: start; }
+.notes dt.mine { color: var(--bad-text); background: var(--bad-soft); }
+.notes dd.others { display: grid; gap: 5px; }
+.opt-why b, .notes dd.mine b { font-family: var(--en); font-weight: 800; }
+.opt-why b { margin-right: .45em; }
+.notes dd.mine b { color: var(--bad-text); }
 
 /* 答えたあと、選択肢の下に出す段（ch-）：文法は品詞の札と意味、単語はその選択肢の意味 */
 .choice .txt { min-width: 0; }
@@ -552,6 +559,12 @@ html.bars-themed .tabs { background: var(--bg); -webkit-backdrop-filter: none; b
 .missed summary::-webkit-details-marker { display: none; }
 .missed summary small { display: block; font-family: var(--sans); color: var(--good-text); font-weight: 800; margin-top: 2px; }
 .missed details p { margin-top: 8px; font-size: .92rem; }
+/* 結果の「まちがえた問題」：あなたの答え（赤）と正解（緑）を並べる */
+.missed summary .ans { display: block; margin-top: 4px; }
+.missed summary .ans small { margin-top: 0; }
+.missed summary small.mine { color: var(--bad-text); }
+.missed summary small b[lang="en"], .missed details p b[lang="en"] { font-family: var(--en); }
+.missed details p.mine b { color: var(--bad-text); }
 .result-actions { display: grid; gap: 12px; }
 .result-grid > div > * + * { margin-top: 16px; }
 .result-grid > div + div { margin-top: 16px; }
@@ -1046,6 +1059,7 @@ html.calm *, html.calm *::before, html.calm *::after { transition-duration: .01s
 <script src="js/words.js"></script>
 <script src="js/grammar.js"></script>
 <script src="js/grammar-notes.js"></script>
+<script src="js/grammar-why.js"></script>
 <script src="js/gloss.js"></script>
 <script src="js/lines.js"></script>
 <script src="voice/index.js"></script>

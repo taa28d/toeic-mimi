@@ -2,7 +2,7 @@
 // 版（CACHE）ごとに全部のファイルをまとめて保存し、その版のファイルだけを返す（古い版と新しい版が混ざらない）。
 // sw.js が変わるとブラウザが新しい版を取りに来て、届いたらすぐ切り替える。画面には「新しい版になりました」と出る。
 // ファイルを直したら CACHE の番号を上げる。
-const CACHE = 'toeic-mimi-v23';
+const CACHE = 'toeic-mimi-v24';
 // 英語の音声（voice/*.mp3、約770個）は数が多いので、アプリの版とは別に保存し、版が上がっても取り直さない。
 // 一度鳴らしたもの、またはアプリが空いた時間に少しずつ取ったものから保存される。
 // 音声を作り直したら番号を上げる（js/app.js の VOICE_CACHE も同じ名前にする）
@@ -18,6 +18,7 @@ const FILES = [
   './js/words.js',
   './js/grammar.js',
   './js/grammar-notes.js',
+  './js/grammar-why.js',
   './js/gloss.js',
   './js/lines.js',
   './voice/index.js',
