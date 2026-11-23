@@ -8,7 +8,7 @@
   const hasDraw = Boolean(window.DrawSVGPlugin);
   const hasPhysics = Boolean(window.Physics2DPlugin);
   if (window.CustomWiggle) window.CustomWiggle.create('errShake', { wiggles: 3, type: 'easeOut' });
-  const VERSION = '1.6.6';
+  const VERSION = '1.7.0';
   const NS = 'http://www.w3.org/2000/svg';
 
   const LINES = window.MIMI_LINES;
@@ -919,7 +919,8 @@
   }
 
   /* ━━ 9. 画面の切り替え ━━ */
-  const TABBED = ['home', 'words', 'grammar', 'records'];
+  // 下のタブ（左から）：プロフィール・文法・ホーム・単語・設定
+  const TABBED = ['profile', 'grammar', 'home', 'words', 'settings'];
   const tabsEl = $('tabs');
   const tabButtons = [...tabsEl.querySelectorAll('.tab')];
   let pillPlaced = false;
@@ -974,8 +975,11 @@
      そのとき1つ上の画面へ移る。ホームで戻ると、Android のふつうの動きどおりアプリを閉じる */
   let guarded = Boolean(history.state && history.state.mimi); // 再読み込みしたとき、しおりの上にいることがある
   let dropping = false; // こちらから history.back() でしおりを片づけている最中
+  let guardLater = false; // 片づけている最中に別の画面へ移ったら、片づけが終わってからしおりを置く
   function syncHistory(name) {
     const root = name === 'home' || name === 'welcome';
+    // history.back() は少しあとで効く。そのあいだに pushState すると、戻りすぎてアプリの外へ出てしまう
+    if (dropping) { guardLater = !root; return; }
     if (!root && !guarded) {
       history.pushState({ mimi: 1 }, '');
       guarded = true;
@@ -986,7 +990,11 @@
     }
   }
   window.addEventListener('popstate', e => {
-    if (dropping) { dropping = false; return; }
+    if (dropping) {
+      dropping = false;
+      if (guardLater) { guardLater = false; history.pushState({ mimi: 1 }, ''); guarded = true; }
+      return;
+    }
     if (e.state && e.state.mimi) { guarded = true; return; } // 「進む」でしおりへ戻ってきた
     guarded = false;
     goUp();
@@ -996,7 +1004,7 @@
     if (current === 'quiz') { askQuit(); return; }
     if (current === 'cards') { openWords(); return; }
     if (current === 'lesson') { openGrammar(); return; }
-    if (['words', 'grammar', 'records', 'result'].includes(current)) goHome(current === 'result');
+    if (['words', 'grammar', 'profile', 'settings', 'result'].includes(current)) goHome(current === 'result');
   }
 
   // 画面に入るときの動き：上のまとまりから順に、下から浮かび上がる（合計0.4秒以内）
@@ -1012,7 +1020,7 @@
   tabButtons.forEach(tab => tab.addEventListener('click', () => {
     const go = tab.dataset.go;
     if (go === current) return;
-    ({ home: goHome, words: openWords, grammar: openGrammar, records: openRecords })[go]();
+    ({ home: goHome, words: openWords, grammar: openGrammar, profile: openProfile, settings: openSettings })[go]();
   }));
   window.addEventListener('resize', () => { if (TABBED.includes(current)) placePill(current, false); });
 
@@ -1735,7 +1743,7 @@
   }
 
   /* タイマー：線形で減る輪（時間は均等に流れるので、ここだけは linear） */
-  const timer = { tl: null, left: 0, shown: 0, hurried: false };
+  const timer = { tl: null, left: 0, shown: 0, hurried: false, held: false };
   function startTimer(sec) {
     stopTimer();
     const el = $('timer');
@@ -1788,9 +1796,10 @@
     $('timer-num').textContent = '0';
     answer(-1, true);
   }
+  // アプリを隠したら止め、戻ったら続ける。ただし「ここでやめる？」を聞いて止めているあいだ（held）は止めたまま
   document.addEventListener('visibilitychange', () => {
     if (!timer.tl) return;
-    if (document.hidden) { timer.tl.pause(); speech.stop(); } else timer.tl.resume();
+    if (document.hidden) { timer.tl.pause(); speech.stop(); } else if (!timer.held) timer.tl.resume();
   });
 
   function drawMark(btn, ok) {
@@ -2062,10 +2071,11 @@
   async function askQuit() {
     if (!round || !round.results.length) { round = null; goHome(); return; }
     const pausedTimer = timer.tl;
-    if (pausedTimer) pausedTimer.pause();
+    if (pausedTimer) { pausedTimer.pause(); timer.held = true; }
     const yes = await ask('ここでやめる？', 'ここまでに答えた問題は、ちゃんと記録されているよ。', 'やめる');
+    timer.held = false;
     if (yes) { finishRound(); return; }
-    if (pausedTimer && timer.tl === pausedTimer) pausedTimer.resume();
+    if (pausedTimer && timer.tl === pausedTimer && !document.hidden) pausedTimer.resume();
     syncHistory('quiz'); // 戻るボタンで消えたしおりを置き直す
   }
   $('quiz-close').addEventListener('click', askQuit);
@@ -2090,7 +2100,9 @@
 
   function renderResult(r, n, ok) {
     const rate = Math.round((ok / n) * 100);
-    $('result-title').textContent = `${r.title}　${n}問`;
+    // 「実戦20問」のように題名に数が入っているときは、数を重ねて書かない
+    const inTitle = r.title.match(/(\d+)問$/);
+    $('result-title').textContent = inTitle && Number(inTitle[1]) === n ? r.title : `${r.title}　${n}問`;
     countTo($('result-rate'), rate, { dur: 1 });
     setRing($('result-ring'), rate / 100, { dur: 1.1 });
     const timed = r.results.filter(x => x.q.timed);
@@ -2217,7 +2229,7 @@
     // 次のレッスンで多めに出すもの（苦手の傾向から）
     const next = focusText(weakFocus());
     $('result-next').hidden = !next;
-    $('result-next-text').textContent = next ? `次のレッスンでは、${next}を多めに出すね。まちがえ方は「記録」で見られるよ。` : '';
+    $('result-next-text').textContent = next ? `次のレッスンでは、${next}を多めに出すね。まちがえ方は「プロフィール」で見られるよ。` : '';
 
     const tier = rate === 100 ? 'perfect' : rate >= 80 ? 'great' : rate >= 60 ? 'good' : 'keep';
     gsap.delayedCall(calm() ? 0 : .3, () => {
@@ -2278,7 +2290,8 @@
     const wrong = list.filter(g => map[g.id] && map[g.id].last === 0);
     const rest = list.filter(g => map[g.id] && map[g.id].last === 1).sort((a, b) => map[a.id].at - map[b.id].at);
     const items = [...unseen, ...wrong, ...rest].slice(0, 10).map(g => ({ type: 'grammar', g }));
-    startRound({ title: `${CAT.get(catId).name} 10問`, kind: 'cat', items });
+    // 題名に問題数は入れない（まちがえると類題が足されて10問より増えるので、結果では実際に解いた数を出す）
+    startRound({ title: `${CAT.get(catId).name}の練習`, kind: 'cat', items });
   }
 
   /* ━━ 17. 単語の一覧とカード ━━ */
@@ -2582,22 +2595,25 @@
   });
   $('lesson-close').addEventListener('click', openGrammar);
 
-  /* ━━ 19. 記録と設定 ━━ */
-  function openRecords() {
+  /* ━━ 19. プロフィール（記録）と設定 ━━ */
+  function openProfile() {
     stopRound();
-    show('records');
-    renderRecords();
-    const days = Object.keys(store.data.days).length;
-    say(days ? `これまでに${days}日勉強したね。記録は、がんばった証だよ。` : 'ここに勉強の記録がたまっていくよ。');
+    show('profile');
+    renderProfile();
+    const days = Object.values(store.data.days).filter(x => (x.q || 0) + (x.c || 0) > 0).length;
+    const streak = currentStreak();
+    say(streak >= 2 ? `${streak}日続いてるね！この調子。` : days ? `これまでに${days}日勉強したね。記録は、がんばった証だよ。` : 'ここに勉強の記録がたまっていくよ。');
   }
-  function renderRecords() {
+  function renderProfile() {
     const d = store.data;
     const all = Object.values(d.days);
     const total = all.reduce((s, x) => s + (x.q || 0), 0);
     const right = all.reduce((s, x) => s + (x.ok || 0), 0);
-    $('records-sum').textContent = `Lv.${levelInfo(d.xp).level} ・ ${d.xp} XP`;
+    const name = d.profile.name.trim();
+    $('profile-title').textContent = name ? `${name}さん` : 'プロフィール';
+    $('records-sum').textContent = `Lv.${levelInfo(d.xp).level}（${d.xp.toLocaleString()} XP） ・ 目標 ${d.profile.goal}点`;
     const tiles = [
-      [`${currentStreak()}日`, `連続（最高${d.streak.best}日）`],
+      [`${currentStreak()}日`, `連続・最高${d.streak.best}日`],
       [String(total), '解いた問題'],
       [total ? `${Math.round((right / total) * 100)}%` : '—', '正答率'],
     ];
@@ -2638,7 +2654,21 @@
       li.append(left, make('b', null, `${h.ok}/${h.n}`));
       hist.append(li);
     });
+  }
 
+  function openSettings() {
+    stopRound();
+    show('settings');
+    // 前に開いた引き継ぎコードの欄は閉じておく（消した記録のコードが残って見えないように）
+    $('transfer').hidden = true;
+    $('transfer-text').value = '';
+    transferNote('');
+    transferMode = null;
+    renderSettings();
+    say(pick(['音や1日の目標は、ここで変えられるよ。', '機種変更の前は、引き継ぎコードを作っておいてね。']));
+  }
+  function renderSettings() {
+    const d = store.data;
     $('set-name').value = d.profile.name;
     document.querySelectorAll('.seg').forEach(seg => {
       const value = String({ daily: d.profile.daily, timer: d.settings.timer, motion: d.settings.motion }[seg.dataset.set]);
@@ -2882,6 +2912,10 @@
     store.data.lastVisit = dayNo();
     store.save();
     $('transfer').hidden = true;
+    $('transfer-text').value = '';
+    // 読み込んだ記録の設定（動き・BGM）を、すぐ使う
+    applyMotion();
+    if (store.data.settings.music === false) bgm.stop();
     goHome();
     say('記録を引き継いだよ。おかえり！');
   }
@@ -2964,7 +2998,8 @@
 
   /* ━━ 21. キーボード ━━ */
   document.addEventListener('keydown', e => {
-    if (e.target.matches('input, textarea') || e.metaKey || e.ctrlKey || e.altKey) return;
+    if ((e.target.matches && e.target.matches('input, textarea')) || e.metaKey || e.ctrlKey || e.altKey) return;
+    if ($('ask').open) return; // 「ここでやめる？」などを聞いているあいだは、後ろの問題に答えない
     if (current === 'quiz' && round) {
       const i = ['1', '2', '3', '4'].indexOf(e.key) >= 0 ? ['1', '2', '3', '4'].indexOf(e.key) : ['a', 'b', 'c', 'd'].indexOf(e.key.toLowerCase());
       if (i >= 0 && !round.answered && round.q?.choices) { e.preventDefault(); answer(i); }
@@ -3095,7 +3130,7 @@
   if (window.__TOEIC_HOOK__) {
     window.__TOEIC_HOOK__({
       store, mimi, sound, WORDS, GRAMMAR, SETS, CATS, composeDaily, levelInfo, wordChoices, overlaps, senses,
-      startDaily, startDrill, startCatQuiz, startCards, openLesson, goHome, openWords, openGrammar, openRecords,
+      startDaily, startDrill, startCatQuiz, startCards, openLesson, goHome, openWords, openGrammar, openProfile, openSettings,
       answer: (i, timedOut) => answer(i, timedOut), rightIndex: () => round?.q?.choices?.findIndex(c => c.right) ?? -1,
       next: () => quizEls.next.click(), currentRound: () => round, currentScreen: () => current, deck: () => deck,
       catSkills, confusions, weakFocus, weakWords, nextGrammar, similarGrammar, openGloss, closeGloss,
