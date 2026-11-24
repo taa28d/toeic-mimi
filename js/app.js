@@ -8,7 +8,7 @@
   const hasDraw = Boolean(window.DrawSVGPlugin);
   const hasPhysics = Boolean(window.Physics2DPlugin);
   if (window.CustomWiggle) window.CustomWiggle.create('errShake', { wiggles: 3, type: 'easeOut' });
-  const VERSION = '1.7.2';
+  const VERSION = '1.8.0';
   const NS = 'http://www.w3.org/2000/svg';
 
   const LINES = window.MIMI_LINES;
@@ -1044,7 +1044,7 @@
   }
 
   const fx = $('fx');
-  const BITS = ['#ffb92e', '#3a4bd6', '#11906a', '#f2638b', '#7fd3ff', '#ffffff'];
+  const BITS = ['#f2b43c', '#33406f', '#4fae86', '#efb3a6', '#a9b8e0', '#ffffff']; // 山吹・紺・翡翠・ほおの色・薄い青・白（くすんだ色にそろえる）
   function confetti(x, y, { count = 18, spread = 70, up = -90, power = 1 } = {}) {
     if (calm()) return;
     for (let i = 0; i < count; i++) {
@@ -1276,7 +1276,7 @@
     const mastered = GRAMMAR.filter(gramMastered).length;
     const due = dueWords().length + dueGrammar().length;
     // 定着（3回続けて正解）は時間がかかるので、学習を始めた語の数もいっしょに見せる
-    $('tile-words').textContent = `学習 ${studied}・定着 ${learned} / ${WORDS.length}語`;
+    $('tile-words').textContent = `定着 ${learned} / ${WORDS.length}語（学習 ${studied}）`;
     $('path-title').textContent = `${d.profile.goal}点への道のり`;
     $('tile-grammar').textContent = `正解 ${mastered} / ${GRAMMAR.length}問`;
     $('tile-review').textContent = due ? `${due}問たまっています` : 'いまはありません';
@@ -1345,13 +1345,14 @@
     return pick(modes);
   }
   function buildQuestion(item) {
-    if (item.type === 'intro') return { kind: 'intro', item, word: item.word, tag: item.again ? 'もう一度 ・ 新しい単語' : '新しい単語', tagClass: 'sun' };
+    if (item.type === 'intro') return { kind: 'intro', item, word: item.word, tag: item.again ? 'もう一度　新しい単語' : '新しい単語', tagClass: 'sun' };
     if (item.type === 'grammar') {
       const g = item.g;
       const name = CAT.get(g.cat).name;
       return {
         kind: 'grammar', item, g, timed: round.seconds > 0,
-        tag: item.similar ? `類題 ・ ${name}` : item.again ? `もう一度 ・ ${name}` : round.drill ? 'Part 5' : `Part 5 ・ ${name}`,
+        // 文法は全部 Part 5 なので、札には分野の名前だけを出す（実戦20問は本番と同じく分野を伏せる）
+        tag: item.similar ? `類題　${name}` : item.again ? `もう一度　${name}` : round.drill ? 'Part 5' : name,
         tagClass: item.similar || item.again ? 'bad' : '',
         choiceLang: 'en',
         // oi は grammar.js の並びでの番号（0が正解）。まちがえ方の記録に使う
@@ -1360,7 +1361,7 @@
     }
     const w = item.word;
     const mode = item.mode || wordMode(w, item.fresh);
-    const tag = item.again ? 'もう一度 ・ 単語' : item.review ? '復習 ・ 単語' : '単語';
+    const tag = item.again ? 'もう一度　単語' : item.review ? '復習　単語' : '単語';
     const tagClass = item.review || item.again ? 'bad' : 'sun';
     if (mode === 'reverse') return { kind: 'reverse', item, word: w, tag, tagClass, choiceLang: 'en', choices: wordChoices(w, 'en') };
     return { kind: mode, item, word: w, tag, tagClass, choiceLang: 'ja', choices: wordChoices(w, 'ja') };
@@ -2303,15 +2304,15 @@
   }
   function renderWords() {
     const learned = WORDS.filter(wordLearned).length;
-    $('words-sum').textContent = `定着 ${learned} / ${WORDS.length}語 ・ 20語ずつ ${SETS.length}セット`;
+    $('words-sum').textContent = `定着 ${learned} / ${WORDS.length}語　20語ずつ ${SETS.length}セット`;
     const next = setOrder().find(set => set.words.some(w => !wordLearned(w)));
     const box = $('words-list');
     box.replaceChildren();
     LEVELS.forEach(level => {
       const head = make('div', 'level-head');
-      // 「Lv.」は自分のレベル（Lv.3 など）とまぎれるので、単語の段階は STEP と呼ぶ
+      // 「Lv.」は自分のレベル（Lv.3 など）とまぎれるので、単語の段階は「ステップ」と呼び、丸の中に番号だけを出す
       const badge = make('b');
-      badge.append(make('span', 'step-label', 'STEP'), ' ', make('span', 'step-no', level.level));
+      badge.append(make('span', 'sr', 'ステップ'), make('span', 'step-no', level.level));
       head.append(badge, make('h2', null, level.name), make('small', null, level.note));
       const list = make('div', 'sets');
       SETS.filter(set => set.level === level.level).forEach(set => {
@@ -2319,7 +2320,7 @@
         const seen = set.words.filter(w => store.data.words[w.id]).length;
         const row = make('div', `set${set === next ? ' next' : ''}`);
         const name = make('div', 'set-name');
-        name.append(make('small', null, `SET ${set.no}`));
+        name.append(make('small', null, `セット ${set.no}`));
         const title = make('b', null, set.name);
         if (set === next) title.append(make('span', 'badge-next', 'おすすめ'));
         name.append(title);
@@ -2331,11 +2332,16 @@
         test.type = 'button';
         test.addEventListener('click', () => startSetTest(set.index));
         btns.append(cards, test);
+        // 棒：濃い色が定着、その後ろの薄い色が学習ずみ（一度でも出た語）
         const meter = make('div', 'set-meter');
-        const bar = make('i', 'bar sun');
+        const bar = make('i', 'bar');
+        const seenBar = make('i', 'seen');
+        seenBar.style.width = `${(seen / 20) * 100}%`;
         const fill = make('i');
-        bar.append(fill);
-        meter.append(bar, make('span', null, `定着 ${done}/20 ・ 学習 ${seen}/20`));
+        bar.append(seenBar, fill);
+        const label = make('span', null, `定着 ${done}/20`);
+        if (seen > done) label.append(make('small', null, `（学習 ${seen}）`));
+        meter.append(bar, label);
         row.append(name, btns, meter);
         list.append(row);
         setBar(fill, done / 20, .8, .2);
@@ -2353,7 +2359,7 @@
       return (due(sa) - due(sb)) || ((sa?.b ?? 0) - (sb?.b ?? 0));
     });
     const items = shuffle(order.slice(0, 10)).map(word => ({ type: 'word', word }));
-    startRound({ title: `SET ${set.no} テスト`, kind: 'set', items });
+    startRound({ title: `セット${set.no}のテスト`, kind: 'set', items });
   }
 
   let deck = null;
@@ -2387,7 +2393,7 @@
     const front = make('div', 'face front');
     const big = make('b', 'big', w.en);
     big.lang = 'en';
-    front.append(make('span', 'pos', POS_JA[w.pos]), big, make('span', 'hint', 'タップでめくる ・ 左右にスワイプ'));
+    front.append(make('span', 'pos', POS_JA[w.pos]), big, make('span', 'hint', 'タップでめくる　左右にスワイプ'));
     const back = make('div', 'face back');
     const ex = make('div', 'ex');
     ex.append(exampleNode(w), make('p', null, w.exJa));
@@ -2513,7 +2519,7 @@
   function renderGrammar() {
     const map = store.data.gram;
     const mastered = GRAMMAR.filter(gramMastered).length;
-    $('grammar-sum').textContent = `正解 ${mastered} / ${GRAMMAR.length}問 ・ ${CATS.length}分野`;
+    $('grammar-sum').textContent = `正解 ${mastered} / ${GRAMMAR.length}問　${CATS.length}分野`;
     $('g-drill-sub').textContent = `全分野から・1問${timerSec() || 20}秒`;
     const due = dueGrammar().length;
     $('g-review-sub').textContent = due ? `${due}問` : 'いまはありません';
@@ -2539,7 +2545,7 @@
       const fill = make('i');
       bar.append(fill);
       const tried = list.filter(g => map[g.id]).length;
-      meter.append(bar, make('span', null, `正解 ${ok}/${list.length}${tried ? '' : ' ・ まだ'}`));
+      meter.append(bar, make('span', null, `正解 ${ok}/${list.length}${tried ? '' : '（まだ）'}`));
       row.append(name, btns, meter);
       box.append(row);
       setBar(fill, ok / list.length, .8, .2);
@@ -2567,7 +2573,7 @@
     const fill = () => {
       const ex = make('p', 'lex', c.ex);
       ex.lang = 'en';
-      card.replaceChildren(make('p', 'lno', `POINT ${lesson.i + 1}`), make('h2', null, c.h), make('p', 'lp', c.p), ex);
+      card.replaceChildren(make('p', 'lno', `コツ ${lesson.i + 1}`), make('h2', null, c.h), make('p', 'lp', c.p), ex);
       $('lesson-count').textContent = `${lesson.i + 1} / ${lesson.cat.lesson.length}`;
       $('lesson-prev').disabled = lesson.i === 0;
       $('lesson-next').textContent = last ? '問題を解く（10問）' : 'つぎへ';
@@ -2611,7 +2617,7 @@
     const right = all.reduce((s, x) => s + (x.ok || 0), 0);
     const name = d.profile.name.trim();
     $('profile-title').textContent = name ? `${name}さん` : 'プロフィール';
-    $('records-sum').textContent = `Lv.${levelInfo(d.xp).level}（${d.xp.toLocaleString()} XP） ・ 目標 ${d.profile.goal}点`;
+    $('records-sum').textContent = `Lv.${levelInfo(d.xp).level}（${d.xp.toLocaleString()} XP）　目標 ${d.profile.goal}点`;
     const tiles = [
       [`${currentStreak()}日`, `連続・最高${d.streak.best}日`],
       [String(total), '解いた問題'],
@@ -2675,7 +2681,7 @@
       seg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === value)));
     });
     document.querySelectorAll('[data-toggle]').forEach(sw => sw.setAttribute('aria-checked', String(Boolean(d.settings[sw.dataset.toggle]))));
-    $('about-version').textContent = `バージョン ${VERSION} ・ 単語 ${WORDS.length}語 ・ 文法 ${GRAMMAR.length}問`;
+    $('about-version').textContent = `バージョン ${VERSION}　単語 ${WORDS.length}語　文法 ${GRAMMAR.length}問`;
     renderExportLast();
     renderInstall();
   }

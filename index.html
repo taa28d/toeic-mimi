@@ -25,7 +25,8 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <style>
 /* 画面構成：1列で上から読む。広い画面（折りたたみスマホを開いたときなど）は2列。
-   色：紙のような生成りの地に、ミミのネクタイの藍。正解は翡翠、不正解は朱、XPと星は山吹 */
+   色：紙のような生成りの地に、アプリのアイコンのくすんだ紺。正解は翡翠、不正解は朱、山吹は「おすすめ・苦手・XP」だけ。
+   文字の太さ：見出しと強調は 700、ふだんの文字と補足は 400〜600（全部を太くすると強弱がなくなる） */
 :root {
   /* 画面の端で、ノッチ・ホームバー・角丸に隠れる幅。確認のときはここを数値で上書きして端末の形を再現する */
   --sa-top: env(safe-area-inset-top, 0px);
@@ -38,7 +39,7 @@
   /* すりガラスのタブ：ガラスの色・上のふちの光・ふち線・影・選んでいるタブのレンズ */
   /* 明るい画面では白いカードや背景に溶けないよう、ふち線と影をはっきりさせ、レンズにアクセントの薄い青を入れる */
   --glass: rgba(250, 248, 252, .74); --glass-hi: rgba(255, 255, 255, .95); --glass-line: rgba(47, 39, 71, .12);
-  --glass-shade: rgba(47, 39, 71, .42); --lens: rgba(222, 226, 251, .96); --lens-hi: rgba(255, 255, 255, .9);
+  --glass-shade: rgba(47, 39, 71, .42); --lens: rgba(229, 231, 242, .96); --lens-hi: rgba(255, 255, 255, .9);
 
   --bg: #f6f1e7;
   --surface: #fffdf8;
@@ -48,32 +49,38 @@
   --text: #1f2233;
   --muted: #5b5e70;
   --faint: #6a6c7e;   /* 生成りの地で文字の読みやすさ 4.5:1 以上 */
-  --accent: #3a4bd6;
-  --accent-2: #5b6cf2;
+  /* 主役の色は、アプリのアイコンの地と同じ「くすんだ紺」。文字に使う紺はアイコンのカードの文字の色 */
+  --navy: #33406f;
+  --accent: #33406f;
+  --accent-2: #4a5688;
   --on-accent: #ffffff;
-  --accent-soft: #e4e7fb;
-  --accent-text: #2c3bb5;
-  --sun: #ffb92e;
-  --sun-soft: #fff0cc;
-  --sun-text: #855600;
-  --good: #11906a;
-  --good-soft: #daf2e7;
-  --good-text: #096146;
+  --accent-soft: #e5e7f0;
+  --accent-text: #2f3f8f;
+  /* 山吹は「おすすめ・苦手・XP」だけに使う */
+  --sun: #f2b43c;
+  --sun-soft: #fbefd2;
+  --sun-text: #7a5300;
+  /* 白い文字をのせる翡翠と朱は、4.5:1 以上になる濃さ */
+  --good: #277a5c;
+  --good-soft: #dcefe5;
+  --good-text: #1f6b4f;
   --on-good: #ffffff;
-  --bad: #db4c39;
-  --bad-soft: #fce3dc;
-  --bad-text: #a72f1d;
+  --bad: #c24c37;
+  --bad-soft: #f9e2da;
+  --bad-text: #a23a27;
   --on-bad: #ffffff;
   --warn: #ea8419;
   --warn-text: #a85500; /* 残り時間の数字。地との差を 4.5:1 以上に */
   --pink: #f2638b;
   --tie: #34449a; /* ミミのネクタイ（くすんだ紺） */
   /* 品詞の札の色（名詞・動詞・形容詞・副詞）。白い地で 4.5:1 以上 */
-  --pos-n: #2c3bb5; --pos-v: #7a3fc4; --pos-a: #855600; --pos-d: #0b6a74;
+  --paper: #fffaf2; --paper-ink: #2f3f8f; /* 紺の上にのせる、アイコンの紙の色のボタン */
+  --score-a: #277a5c; --score-b: #4fae86; /* 結果の輪 */
+  --pos-n: #2f3f8f; --pos-v: #7a3fc4; --pos-a: #855600; --pos-d: #0b6a74;
   --shadow: 0 1px 0 rgba(47, 39, 71, .05), 0 12px 30px -18px rgba(47, 39, 71, .35);
-  --blob-1: #ffd7a6;
-  --blob-2: #c7cfff;
-  --blob-3: #ffc6cf;
+  --blob-1: #f3d9b9;
+  --blob-2: #d3d7e8;
+  --blob-3: #f0d0c8;
 
   --sans: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic UI", "Segoe UI", Meiryo, sans-serif;
   --en: "Avenir Next", Avenir, "Segoe UI Variable Display", "Segoe UI", "Helvetica Neue", Arial, var(--sans);
@@ -87,32 +94,37 @@
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #131527; --surface: #1d2036; --surface-2: #22263f; --sunken: #2a2e4a; --line: #383d60;
-    --text: #f2f2f8; --muted: #b9bbce; --faint: #8d90aa;
-    --accent: #8f9cff; --accent-2: #aab3ff; --on-accent: #0f1230; --accent-soft: #283062; --accent-text: #b8c0ff;
-    --sun: #ffc44d; --sun-soft: #3e3219; --sun-text: #ffd67c;
-    --good: #47d3a0; --good-soft: #163c31; --good-text: #82e7c2; --on-good: #062418;
-    --bad: #ff8a77; --bad-soft: #44231f; --bad-text: #ffb4a8; --on-bad: #2f0b06;
+    /* 暗い画面：夜のノート。地は少し暖かい紺、文字は生成り、主役のボタンはアイコンの紙の色 */
+    --navy: #2e3966;
+    --bg: #1a1f33; --surface: #242a42; --surface-2: #2a3150; --sunken: #313857; --line: #414a6e;
+    --text: #f4eee3; --muted: #c9c1b2; --faint: #a39c8f;
+    --accent: #efe5d2; --accent-2: #f7efe0; --on-accent: #26305a; --accent-soft: #2f3760; --accent-text: #c3ccf2;
+    --sun: #f2c45a; --sun-soft: #3f3420; --sun-text: #f6d488;
+    --good: #5cc29b; --good-soft: #1d3a33; --good-text: #93dcc0; --on-good: #0d2a20;
+    --bad: #f08a74; --bad-soft: #43271f; --bad-text: #ffb7a6; --on-bad: #3a120a;
     --warn: #ffab4a; --warn-text: #ffb760; --pink: #ff86a8; --tie: #4456b0;
-    --pos-n: #b8c0ff; --pos-v: #d2b8ff; --pos-a: #ffd67c; --pos-d: #86dde5;
+    --paper: #efe5d2; --paper-ink: #26305a; --score-a: #3f9f7a; --score-b: #6fd0a8;
+    --pos-n: #c3ccf2; --pos-v: #d2b8ff; --pos-a: #ffd67c; --pos-d: #86dde5;
     --shadow: 0 1px 0 rgba(0, 0, 0, .25), 0 16px 34px -20px rgba(0, 0, 0, .8);
-    --blob-1: #4a3a6a; --blob-2: #22356f; --blob-3: #5b2e50;
+    --blob-1: #3a3350; --blob-2: #243a6a; --blob-3: #47304a;
     --glass: rgba(34, 38, 64, .52); --glass-hi: rgba(255, 255, 255, .22); --glass-line: rgba(255, 255, 255, .1);
     --glass-shade: rgba(0, 0, 0, .6); --lens: rgba(255, 255, 255, .13); --lens-hi: rgba(255, 255, 255, .3);
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #131527; --surface: #1d2036; --surface-2: #22263f; --sunken: #2a2e4a; --line: #383d60;
-  --text: #f2f2f8; --muted: #b9bbce; --faint: #8d90aa;
-  --accent: #8f9cff; --accent-2: #aab3ff; --on-accent: #0f1230; --accent-soft: #283062; --accent-text: #b8c0ff;
-  --sun: #ffc44d; --sun-soft: #3e3219; --sun-text: #ffd67c;
-  --good: #47d3a0; --good-soft: #163c31; --good-text: #82e7c2; --on-good: #062418;
-  --bad: #ff8a77; --bad-soft: #44231f; --bad-text: #ffb4a8; --on-bad: #2f0b06;
+  --navy: #2e3966;
+  --bg: #1a1f33; --surface: #242a42; --surface-2: #2a3150; --sunken: #313857; --line: #414a6e;
+  --text: #f4eee3; --muted: #c9c1b2; --faint: #a39c8f;
+  --accent: #efe5d2; --accent-2: #f7efe0; --on-accent: #26305a; --accent-soft: #2f3760; --accent-text: #c3ccf2;
+  --sun: #f2c45a; --sun-soft: #3f3420; --sun-text: #f6d488;
+  --good: #5cc29b; --good-soft: #1d3a33; --good-text: #93dcc0; --on-good: #0d2a20;
+  --bad: #f08a74; --bad-soft: #43271f; --bad-text: #ffb7a6; --on-bad: #3a120a;
   --warn: #ffab4a; --warn-text: #ffb760; --pink: #ff86a8; --tie: #4456b0;
-  --pos-n: #b8c0ff; --pos-v: #d2b8ff; --pos-a: #ffd67c; --pos-d: #86dde5;
+  --paper: #efe5d2; --paper-ink: #26305a; --score-a: #3f9f7a; --score-b: #6fd0a8;
+  --pos-n: #c3ccf2; --pos-v: #d2b8ff; --pos-a: #ffd67c; --pos-d: #86dde5;
   --shadow: 0 1px 0 rgba(0, 0, 0, .25), 0 16px 34px -20px rgba(0, 0, 0, .8);
-  --blob-1: #4a3a6a; --blob-2: #22356f; --blob-3: #5b2e50;
+  --blob-1: #3a3350; --blob-2: #243a6a; --blob-3: #47304a;
   --glass: rgba(34, 38, 64, .52); --glass-hi: rgba(255, 255, 255, .22); --glass-line: rgba(255, 255, 255, .1);
   --glass-shade: rgba(0, 0, 0, .6); --lens: rgba(255, 255, 255, .13); --lens-hi: rgba(255, 255, 255, .3);
   color-scheme: dark;
@@ -157,7 +169,7 @@ input, textarea { font: inherit; color: inherit; }
 .b1 { left: -30vmax; top: -10vmax; background: radial-gradient(closest-side, var(--blob-1), transparent); }
 .b2 { right: -32vmax; top: 18vh; background: radial-gradient(closest-side, var(--blob-2), transparent); }
 .b3 { left: -10vmax; bottom: -30vmax; background: radial-gradient(closest-side, var(--blob-3), transparent); opacity: .38; }
-.floaters span { position: absolute; font: 800 1.6rem/1 var(--en); color: var(--accent); opacity: .07; will-change: transform; }
+.floaters span { position: absolute; font: 700 1.6rem/1 var(--en); color: var(--accent); opacity: .07; will-change: transform; }
 
 /* ── 全体の枠 ── */
 /* z-index を付けない：付けると、中の固定ボタン（つぎへ）の重なりがこの中に閉じこめられ、下端の帯より下になる。
@@ -176,7 +188,7 @@ body[data-screen="quiz"] .app, body[data-screen="lesson"] .app { padding-bottom:
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   min-height: 52px; padding: 0 22px; border-radius: 999px;
   background: var(--accent); color: var(--on-accent);
-  font-weight: 800; font-size: 1.02rem; letter-spacing: .02em;
+  font-weight: 700; font-size: 1.02rem; letter-spacing: .01em;
   box-shadow: 0 5px 0 -1px color-mix(in srgb, var(--accent) 62%, #000), 0 12px 24px -14px var(--accent);
   transition: transform var(--spring-dur) var(--spring), box-shadow .2s;
 }
@@ -184,7 +196,7 @@ body[data-screen="quiz"] .app, body[data-screen="lesson"] .app { padding-bottom:
 .btn:disabled { opacity: .45; }
 .btn.ghost { background: var(--surface); color: var(--text); box-shadow: inset 0 0 0 2px var(--line); }
 .btn.ghost:active:not(:disabled), .btn.ghost.is-pressed:not(:disabled) { box-shadow: inset 0 0 0 2px var(--line); }
-.btn.white { background: #fff; color: #2c3bb5; box-shadow: 0 5px 0 -1px rgba(10, 16, 70, .35); }
+.btn.white { background: var(--paper); color: var(--paper-ink); box-shadow: 0 4px 0 -1px #1d254a; }
 .btn.good { background: var(--good); color: var(--on-good); box-shadow: 0 5px 0 -1px color-mix(in srgb, var(--good) 60%, #000); }
 .btn.bad { background: var(--surface); color: var(--bad-text); box-shadow: inset 0 0 0 2px var(--bad); }
 .btn.wide { width: 100%; }
@@ -208,7 +220,7 @@ body[data-screen="quiz"] .app, body[data-screen="lesson"] .app { padding-bottom:
   background: var(--surface); color: var(--text);
   border-radius: 18px; padding: 11px 15px;
   box-shadow: var(--shadow), inset 0 0 0 2px color-mix(in srgb, var(--line) 70%, transparent);
-  font-size: .98rem; line-height: 1.65; font-weight: 600;
+  font-size: .98rem; line-height: 1.65; font-weight: 500;
 }
 .bubble::before {
   content: ""; position: absolute; left: -7px; top: 50%; width: 15px; height: 15px; margin-top: -8px;
@@ -239,7 +251,7 @@ body[data-screen="quiz"] .app, body[data-screen="lesson"] .app { padding-bottom:
   position: absolute; left: 0; top: 0; width: 20%; height: 56px; border-radius: 29px; background: var(--lens); will-change: transform;
   box-shadow: inset 0 1px 0 var(--lens-hi), inset 0 -3px 8px rgba(47, 39, 71, .07), 0 6px 14px -8px var(--glass-shade);
 }
-.tab { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; min-width: 0; font-size: .66rem; font-weight: 700; letter-spacing: -.02em; white-space: nowrap; color: var(--faint); }
+.tab { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; min-width: 0; font-size: .66rem; font-weight: 600; letter-spacing: -.02em; white-space: nowrap; color: var(--faint); }
 .tab .icon { width: 1.45rem; height: 1.45rem; }
 @media (max-width: 340px) { .tab { font-size: .6rem; letter-spacing: -.04em; } }
 .tab[aria-current="page"] { color: var(--accent-text); }
@@ -255,9 +267,9 @@ body[data-screen="quiz"] .app, body[data-screen="lesson"] .app { padding-bottom:
   display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%;
   padding: 14px 18px; min-height: 56px; border-radius: 16px; text-align: left;
   background: var(--surface); box-shadow: var(--shadow), inset 0 0 0 2px var(--line);
-  font-weight: 700; transition: transform var(--spring-dur) var(--spring);
+  font-weight: 600; transition: transform var(--spring-dur) var(--spring);
 }
-.opt small { color: var(--muted); font-weight: 600; }
+.opt small { color: var(--muted); font-weight: 500; }
 .opt:active, .opt.is-pressed { transform: scale(.97); transition-duration: .08s; }
 .opt[aria-pressed="true"] { box-shadow: inset 0 0 0 2.5px var(--accent); background: var(--accent-soft); }
 .field { width: 100%; min-height: 54px; padding: 0 18px; border-radius: 16px; border: 0; background: var(--surface); box-shadow: inset 0 0 0 2px var(--line); font-size: 1.1rem; }
@@ -270,11 +282,11 @@ body[data-screen="quiz"] .app, body[data-screen="lesson"] .app { padding-bottom:
 /* 1行目に日付とレベル・連続日数、その下にあいさつを横幅いっぱいに1行で。
    名前は途中で折り返さない（入りきらないときだけ、名前ごと次の行へ） */
 .home-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.date { color: var(--muted); font-size: .85rem; font-weight: 700; }
-.hello { margin-top: 6px; font-size: 1.5rem; line-height: 1.3; font-weight: 800; letter-spacing: .01em; }
+.date { color: var(--muted); font-size: .85rem; font-weight: 600; }
+.hello { margin-top: 6px; font-size: 1.5rem; line-height: 1.3; font-weight: 700; letter-spacing: .01em; }
 .hello-name { display: inline-block; max-width: 100%; vertical-align: top; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .chips { display: flex; gap: 8px; flex: none; }
-.chip { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px; border-radius: 999px; background: var(--surface); box-shadow: var(--shadow); font-weight: 800; font-size: .9rem; white-space: nowrap; }
+.chip { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px; border-radius: 999px; background: var(--surface); box-shadow: var(--shadow); font-weight: 700; font-size: .9rem; white-space: nowrap; }
 .chip .icon { width: 1.15rem; height: 1.15rem; }
 .chip.streak { color: #e8590c; }
 .chip.streak b { color: var(--text); }
@@ -293,30 +305,29 @@ body[data-screen="quiz"] .app, body[data-screen="lesson"] .app { padding-bottom:
 .bubble.with-tip { justify-self: stretch; }
 .bubble-tip { display: flex; gap: 6px; align-items: flex-start; margin-top: 9px; padding-top: 9px; border-top: 1.5px dashed color-mix(in srgb, var(--line) 85%, transparent); font-size: .84rem; line-height: 1.6; font-weight: 500; color: var(--muted); }
 .bubble-tip .icon { width: 1rem; height: 1rem; margin-top: 3px; color: var(--sun-text); }
-.bubble-tip b { color: var(--sun-text); font-weight: 800; margin-right: .35em; }
+.bubble-tip b { color: var(--sun-text); font-weight: 700; margin-right: .35em; }
 
 .today {
   position: relative; overflow: hidden;
   display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px 12px; align-items: center;
   padding: 20px; border-radius: 26px; color: #fff;
-  background: linear-gradient(135deg, #3445d0, #6070f4 60%, #7b6cf0);
-  box-shadow: 0 18px 36px -22px #3445d0;
+  background: var(--navy);
+  box-shadow: 0 18px 36px -24px rgba(23, 30, 60, .75);
 }
-.today::after { content: ""; position: absolute; right: -40px; top: -60px; width: 180px; height: 180px; border-radius: 50%; background: rgba(255, 255, 255, .1); pointer-events: none; }
-.today h2 { font-size: 1.25rem; font-weight: 800; }
+.today h2 { font-size: 1.25rem; font-weight: 700; }
 .today-sub { font-size: .88rem; opacity: .9; margin-top: 2px; }
 .today-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-.today-chips span { padding: 3px 10px; border-radius: 99px; background: rgba(255, 255, 255, .18); font-size: .8rem; font-weight: 700; }
+.today-chips span { padding: 3px 10px; border-radius: 99px; background: rgba(255, 250, 242, .14); font-size: .8rem; font-weight: 600; }
 .today-chips .chip-focus { background: var(--sun); color: #3d2a00; } /* 苦手な分野を多めにしているとき */
 .today-go { grid-column: 1 / -1; width: 100%; }
 .ring { position: relative; width: 86px; height: 86px; }
 .ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
 .ring circle { fill: none; stroke-width: 8; stroke-linecap: round; }
-.ring-track { stroke: rgba(255, 255, 255, .22); }
-.ring-bar { stroke: #fff; }
+.ring-track { stroke: rgba(255, 250, 242, .2); }
+.ring-bar { stroke: #fffaf2; }
 .ring-num { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; line-height: 1.05; }
-.ring-num b { font: 800 1.6rem/1 var(--en); font-variant-numeric: tabular-nums; }
-.ring-num small { font-size: .7rem; opacity: .9; font-weight: 700; }
+.ring-num b { font: 700 1.6rem/1 var(--en); font-variant-numeric: tabular-nums; }
+.ring-num small { font-size: .7rem; opacity: .9; font-weight: 600; }
 
 .quick { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .tile {
@@ -327,7 +338,7 @@ body[data-screen="quiz"] .app, body[data-screen="lesson"] .app { padding-bottom:
 .tile:active:not(:disabled), .tile.is-pressed:not(:disabled) { transform: scale(.96); transition-duration: .08s; }
 .tile:disabled { opacity: .55; }
 .tile b { font-size: 1rem; margin-top: 4px; }
-.tile small { color: var(--muted); font-size: .8rem; font-weight: 600; }
+.tile small { color: var(--muted); font-size: .8rem; font-weight: 500; }
 .tile-icon { width: 40px; height: 40px; border-radius: 13px; display: grid; place-items: center; }
 .c-sun { background: var(--sun-soft); color: var(--sun-text); }
 .c-accent { background: var(--accent-soft); color: var(--accent-text); }
@@ -335,60 +346,61 @@ body[data-screen="quiz"] .app, body[data-screen="lesson"] .app { padding-bottom:
 .c-good { background: var(--good-soft); color: var(--good-text); }
 
 .card { padding: 18px; border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow); }
-.card h2, .sec-title { font-size: 1.05rem; font-weight: 800; }
+.card h2, .sec-title { font-size: 1.05rem; font-weight: 700; }
 .card h2 + *, .sec-title + * { margin-top: 10px; }
-.path-row { display: grid; grid-template-columns: 3em minmax(0, 1fr) auto; align-items: center; gap: 10px; font-size: .9rem; font-weight: 700; }
+.path-row { display: grid; grid-template-columns: 3em minmax(0, 1fr) auto; align-items: center; gap: 10px; font-size: .9rem; font-weight: 600; }
 .path-row + .path-row { margin-top: 8px; }
 .path-row b { font: 700 .85rem var(--en); color: var(--muted); font-variant-numeric: tabular-nums; }
 .bar { display: block; height: 10px; border-radius: 99px; background: var(--sunken); overflow: hidden; }
 .bar i { background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
-.bar.sun i { background: linear-gradient(90deg, #ffa61a, var(--sun)); }
+.bar.sun i { background: linear-gradient(90deg, #e9a23b, var(--sun)); }
 .bar.good i { background: var(--good); }
 .path-note { color: var(--muted); font-size: .8rem; margin-top: 10px; }
 
 /* ── 見出しのある画面（単語・文法・記録） ── */
 .page-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.page-head h1 { font-size: 1.6rem; font-weight: 800; }
-.page-head p { color: var(--muted); font-size: .88rem; font-weight: 600; }
-/* 左に「STEP 3」の札（題と説明の2行ぶんの高さ）、右に題、その下に説明。題と説明は左端をそろえる
+.page-head h1 { font-size: 1.6rem; font-weight: 700; }
+.page-head p { color: var(--muted); font-size: .88rem; font-weight: 500; }
+/* 左に段階の番号の丸（題と説明の2行ぶんの高さ）、右に題、その下に説明。題と説明は左端をそろえる
    （1行に全部並べると、狭い画面で札と題が折り返す） */
 .level-head { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 1px 12px; align-items: center; margin: 28px 0 12px; }
 /* 札の中の文字は、四角の真ん中に寄せる。text-box で行の上下にあるフォントの余白（字の上の空きや、数字にはない下がり部分）を
-   切り落とし、字そのものの高さで上下中央にそろえる。「STEP」は字間の余りが右に付くので、左にも同じだけ足して左右をそろえる */
+   切り落とし、字そのものの高さで上下中央にそろえる */
 .level-head b {
   grid-row: 1 / 3; display: grid; align-content: center; justify-items: center; gap: 6px;
-  width: 52px; height: 52px; border-radius: 16px; color: var(--on-accent); background: var(--accent); line-height: 1;
+  width: 40px; height: 40px; border-radius: 50%; color: var(--on-accent); background: var(--accent); line-height: 1;
 }
-.step-label, .step-no { text-box: trim-both cap alphabetic; }
-.step-label { font: 800 .6rem/1 var(--en); letter-spacing: .1em; padding-left: .1em; }
-.step-no { font: 800 1.45rem/1 var(--en); font-variant-numeric: tabular-nums; }
-.level-head h2 { align-self: end; font-size: 1.15rem; font-weight: 800; line-height: 1.35; }
-.level-head small { align-self: start; color: var(--muted); font-size: .8rem; font-weight: 600; line-height: 1.5; }
+.step-no { text-box: trim-both cap alphabetic; font: 700 1.2rem/1 var(--en); font-variant-numeric: tabular-nums; }
+.level-head h2 { align-self: end; font-size: 1.15rem; font-weight: 700; line-height: 1.35; }
+.level-head small { align-self: start; color: var(--muted); font-size: .8rem; font-weight: 500; line-height: 1.5; }
 .sets { display: grid; gap: 10px; }
 .set { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px 12px; align-items: center; padding: 14px 16px; border-radius: 18px; background: var(--surface); box-shadow: var(--shadow); }
 .set.next { box-shadow: var(--shadow), inset 0 0 0 2.5px var(--sun); }
-.set-name small { display: block; font: 700 .75rem var(--en); color: var(--faint); letter-spacing: .04em; }
+.set-name small { display: block; font: 600 .75rem var(--sans); color: var(--muted); }
 .set-name b { font-size: 1rem; }
 .set-btns { display: flex; gap: 6px; }
-.set-btns button { height: 38px; padding: 0 14px; border-radius: 99px; font-weight: 800; font-size: .85rem; background: var(--accent-soft); color: var(--accent-text); transition: transform var(--spring-dur) var(--spring); }
+.set-btns button { height: 38px; padding: 0 14px; border-radius: 99px; font-weight: 700; font-size: .85rem; background: transparent; color: var(--accent-text); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent-text) 35%, transparent); transition: transform var(--spring-dur) var(--spring); }
 .set-btns button:active, .set-btns button.is-pressed { transform: scale(.92); transition-duration: .08s; }
-.set-btns button.alt { background: var(--sun-soft); color: var(--sun-text); }
-.set-meter { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; font: 700 .78rem var(--en); color: var(--muted); }
-.set-meter .bar { height: 7px; }
-.badge-next { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 99px; background: var(--sun); color: #3d2a00; font-size: .7rem; font-weight: 800; vertical-align: 2px; }
+.set-meter { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; font: 600 .78rem var(--en); color: var(--muted); }
+.set-meter .bar { position: relative; height: 7px; }
+/* 棒の濃い色＝定着、薄い色＝学習ずみ（.seen は幅を直接決める） */
+.set-meter .bar i { position: relative; }
+.set-meter .bar i.seen { position: absolute; left: 0; top: 0; transform: none; background: color-mix(in srgb, var(--accent) 24%, transparent); }
+.set-meter small { font-weight: 500; }
+.badge-next { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 99px; background: var(--sun); color: #3d2a00; font-size: .7rem; font-weight: 700; vertical-align: 2px; }
 
 .cats { display: grid; gap: 10px; }
 .cat { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; align-items: center; padding: 14px 16px; border-radius: 18px; background: var(--surface); box-shadow: var(--shadow); }
 .cat-name b { font-size: 1.02rem; }
-.cat-name small { display: block; color: var(--muted); font-size: .8rem; font-weight: 600; line-height: 1.45; margin-top: 2px; }
+.cat-name small { display: block; color: var(--muted); font-size: .8rem; font-weight: 500; line-height: 1.45; margin-top: 2px; }
 .duo { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
 /* ── 問題 ── */
 .quiz-head { display: grid; grid-template-columns: 42px minmax(0, 1fr) auto; align-items: center; gap: 12px; }
 .progress { display: block; height: 12px; border-radius: 99px; background: var(--sunken); overflow: hidden; }
-.progress i { background: linear-gradient(90deg, var(--good), #34c08f); }
-.counter { font: 800 .9rem var(--en); color: var(--muted); font-variant-numeric: tabular-nums; min-width: 3.2em; text-align: right; }
-.lesson-title { font-size: 1.05rem; font-weight: 800; text-align: center; }
+.progress i { background: linear-gradient(90deg, var(--good), color-mix(in srgb, var(--good) 72%, #fff)); }
+.counter { font: 700 .9rem var(--en); color: var(--muted); font-variant-numeric: tabular-nums; min-width: 3.2em; text-align: right; }
+.lesson-title { font-size: 1.05rem; font-weight: 700; text-align: center; }
 .quiz-body { display: grid; gap: 14px; margin-top: 10px; }
 .quiz-side { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; min-height: 92px; }
 .quiz-side .mimi-spot { width: 84px; }
@@ -397,36 +409,36 @@ body[data-screen="quiz"] .app, body[data-screen="lesson"] .app { padding-bottom:
 .timer circle { fill: none; stroke-width: 6.5; stroke-linecap: round; }
 .timer-track { stroke: var(--sunken); }
 .timer-bar { stroke: var(--accent); transition: stroke .3s; }
-.timer b { position: absolute; inset: 0; display: grid; place-items: center; font: 800 1.3rem/1 var(--en); font-variant-numeric: tabular-nums; }
+.timer b { position: absolute; inset: 0; display: grid; place-items: center; font: 700 1.3rem/1 var(--en); font-variant-numeric: tabular-nums; }
 .timer.warn .timer-bar { stroke: var(--warn); }
 .timer.danger .timer-bar { stroke: var(--bad); }
 .timer.warn b { color: var(--warn-text); }
 .timer.danger b { color: var(--bad-text); }
 
 .qcard { position: relative; padding: 18px 18px 20px; border-radius: 22px; background: var(--surface); box-shadow: var(--shadow); }
-.qtag { display: inline-flex; align-items: center; gap: 6px; padding: 3px 11px; border-radius: 99px; background: var(--accent-soft); color: var(--accent-text); font-size: .76rem; font-weight: 800; }
+.qtag { display: inline-flex; align-items: center; gap: 6px; padding: 3px 11px; border-radius: 99px; background: var(--accent-soft); color: var(--accent-text); font-size: .76rem; font-weight: 700; }
 .qtag.sun { background: var(--sun-soft); color: var(--sun-text); }
 .qtag.bad { background: var(--bad-soft); color: var(--bad-text); }
 .qtext { margin-top: 12px; font-family: var(--serif); font-size: 1.22rem; line-height: 1.7; }
 .qtext .w { display: inline-block; }
-.blank { display: inline-block; min-width: 4.6em; margin: 0 .12em; padding: 0 .2em; border-bottom: 3px solid var(--accent); text-align: center; color: var(--accent-text); font-family: var(--en); font-weight: 800; line-height: 1.35; }
+.blank { display: inline-block; min-width: 4.6em; margin: 0 .12em; padding: 0 .2em; border-bottom: 3px solid var(--accent); text-align: center; color: var(--accent-text); font-family: var(--en); font-weight: 700; line-height: 1.35; }
 .blank.filled { border-color: var(--good); color: var(--good-text); background: var(--good-soft); border-radius: 6px 6px 0 0; }
 .blank.filled.ng { border-color: var(--bad); color: var(--bad-text); background: var(--bad-soft); }
 .qword { display: flex; align-items: center; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
-.qword b { font: 800 clamp(2rem, 9vw, 2.7rem)/1.15 var(--en); letter-spacing: -.01em; overflow-wrap: anywhere; }
+.qword b { font: 700 clamp(2rem, 9vw, 2.7rem)/1.15 var(--en); letter-spacing: -.01em; overflow-wrap: anywhere; }
 .qword.ja b { font-family: var(--sans); font-size: clamp(1.4rem, 6vw, 1.8rem); }
-.pos { display: inline-block; padding: 2px 9px; border-radius: 8px; background: var(--sunken); color: var(--muted); font-size: .78rem; font-weight: 800; }
+.pos { display: inline-block; padding: 2px 9px; border-radius: 8px; background: var(--sunken); color: var(--muted); font-size: .78rem; font-weight: 700; }
 .say-btn { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent-text); transition: transform var(--spring-dur) var(--spring); }
 .say-btn:active, .say-btn.is-pressed { transform: scale(.88); transition-duration: .08s; }
 .say-btn .icon { width: 1.25rem; height: 1.25rem; }
 .say-btn.on { animation: talk .5s ease-in-out infinite alternate; }
 @keyframes talk { to { transform: scale(1.12); } }
 .qhint { margin-top: 10px; color: var(--muted); font-size: .9rem; }
-.intro-meaning { margin-top: 10px; font-size: 1.25rem; font-weight: 800; }
+.intro-meaning { margin-top: 10px; font-size: 1.25rem; font-weight: 700; }
 .ex { margin-top: 12px; padding: 12px 14px; border-radius: 14px; background: var(--surface-2); box-shadow: inset 0 0 0 1.5px var(--line); }
 .ex p[lang="en"] { font-family: var(--serif); font-size: 1.05rem; line-height: 1.6; }
 .ex p + p { margin-top: 4px; color: var(--muted); font-size: .88rem; }
-.ex mark { background: none; color: var(--accent-text); font-weight: 800; border-bottom: 2px solid var(--accent); }
+.ex mark { background: none; color: var(--accent-text); font-weight: 700; border-bottom: 2px solid var(--accent); }
 
 .choices { display: grid; gap: 10px; }
 .choice {
@@ -434,12 +446,12 @@ body[data-screen="quiz"] .app, body[data-screen="lesson"] .app { padding-bottom:
   display: grid; grid-template-columns: 32px minmax(0, 1fr) 26px; align-items: center; gap: 10px;
   width: 100%; min-height: 58px; padding: 10px 14px; text-align: left;
   border-radius: 16px; background: var(--surface); box-shadow: var(--shadow), inset 0 0 0 2px var(--line);
-  font-size: 1.05rem; font-weight: 700; line-height: 1.4;
+  font-size: 1.05rem; font-weight: 600; line-height: 1.4;
   transition: transform var(--spring-dur) var(--spring), box-shadow .2s, background-color .2s, opacity .3s;
 }
 .choice[lang="en"] { font-family: var(--en); font-size: 1.1rem; }
 .choice:active:not([aria-disabled="true"]), .choice.is-pressed:not([aria-disabled="true"]) { transform: scale(.97); transition-duration: .08s; }
-.choice .key { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--sunken); color: var(--muted); font: 800 .85rem var(--en); }
+.choice .key { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--sunken); color: var(--muted); font: 700 .85rem var(--en); }
 .choice .mk { width: 24px; height: 24px; fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
 .choice .mk path { visibility: hidden; }
 .choice.is-right { background: var(--good-soft); box-shadow: inset 0 0 0 2.5px var(--good); color: var(--good-text); }
@@ -456,33 +468,33 @@ body[data-screen="quiz"] .app, body[data-screen="lesson"] .app { padding-bottom:
 .explain.ng { box-shadow: var(--shadow), inset 5px 0 0 0 var(--bad); }
 .explain > * + * { margin-top: 10px; }
 .verdict { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.verdict b { font-size: 1.15rem; font-weight: 800; color: var(--good-text); }
+.verdict b { font-size: 1.15rem; font-weight: 700; color: var(--good-text); }
 .explain.ng .verdict b { color: var(--bad-text); }
-.verdict span { display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border-radius: 99px; background: var(--sunken); color: var(--muted); font: 700 .8rem var(--en); }
+.verdict span { display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border-radius: 99px; background: var(--sunken); color: var(--muted); font: 600 .8rem var(--en); }
 .verdict span.xp { background: var(--sun-soft); color: var(--sun-text); }
 .verdict span .icon { width: .95rem; height: .95rem; }
 .full { display: flex; gap: 10px; align-items: flex-start; }
 .full > p { font-family: var(--serif); font-size: 1.05rem; line-height: 1.6; flex: 1; }
 .full > p b { color: var(--good-text); }
 .notes { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 10px; font-size: .94rem; }
-.notes dt { font-size: .74rem; font-weight: 800; color: var(--accent-text); background: var(--accent-soft); border-radius: 7px; padding: 2px 7px; height: fit-content; margin-top: 2px; white-space: nowrap; }
+.notes dt { font-size: .74rem; font-weight: 700; color: var(--accent-text); background: var(--accent-soft); border-radius: 7px; padding: 2px 7px; height: fit-content; margin-top: 2px; white-space: nowrap; }
 .notes dd { line-height: 1.65; }
 /* まちがえたとき：選んだ答えがなぜダメか（赤）と、ほかの選択肢の理由（1つずつ1行） */
 .notes dt { justify-self: start; }
 .notes dt.mine { color: var(--bad-text); background: var(--bad-soft); }
 .notes dd.others { display: grid; gap: 5px; }
-.opt-why b, .notes dd.mine b { font-family: var(--en); font-weight: 800; }
+.opt-why b, .notes dd.mine b { font-family: var(--en); font-weight: 700; }
 .opt-why b { margin-right: .45em; }
 .notes dd.mine b { color: var(--bad-text); }
 
 /* 答えたあと、選択肢の下に出す段（ch-）：文法は品詞の札と意味、単語はその選択肢の意味 */
 .choice .txt { min-width: 0; }
-.ch-sub { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-top: 5px; font: 700 .8rem/1.45 var(--sans); color: var(--muted); }
+.ch-sub { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-top: 5px; font: 600 .8rem/1.45 var(--sans); color: var(--muted); }
 .choice.is-right .ch-sub, .choice.is-wrong .ch-sub { color: inherit; }
 .ch-text[lang="en"] { font-family: var(--en); font-size: .92rem; }
 .choice.ch-has.is-dim { opacity: .72; } /* ほかの選択肢の品詞も読めるように、薄くしすぎない */
 /* 品詞の札。名詞・動詞・形容詞・副詞だけ色を変えて、形容詞と副詞を見分けやすくする */
-.ptag { display: inline-block; padding: 0 7px; border-radius: 7px; background: var(--surface); box-shadow: inset 0 0 0 1.5px currentColor; color: var(--muted); font: 800 .72rem/1.6 var(--sans); white-space: nowrap; }
+.ptag { display: inline-block; padding: 0 7px; border-radius: 7px; background: var(--surface); box-shadow: inset 0 0 0 1.5px currentColor; color: var(--muted); font: 700 .72rem/1.6 var(--sans); white-space: nowrap; }
 .ptag.t-n { color: var(--pos-n); }
 .ptag.t-v { color: var(--pos-v); }
 .ptag.t-a { color: var(--pos-a); }
@@ -501,8 +513,8 @@ body[data-screen="quiz"] .app, body[data-screen="lesson"] .app { padding-bottom:
 .gloss.g-below::after { bottom: auto; top: -7px; box-shadow: -1.5px -1.5px 0 0 var(--line); }
 .gloss > * + * { margin-top: 6px; }
 .gloss-head { display: flex; align-items: baseline; gap: 4px 10px; flex-wrap: wrap; }
-.gloss-head b { font: 800 1.15rem var(--en); }
-.gloss-head small { color: var(--muted); font-size: .78rem; font-weight: 700; }
+.gloss-head b { font: 700 1.15rem var(--en); }
+.gloss-head small { color: var(--muted); font-size: .78rem; font-weight: 600; }
 .gloss-ja { display: flex; align-items: baseline; gap: 8px; font-weight: 700; }
 .gloss-ja .ptag { flex: none; }
 .gloss-ph { padding: 6px 10px; border-radius: 10px; background: var(--sun-soft); font-size: .88rem; }
@@ -534,9 +546,9 @@ body[data-screen="quiz"] .app, body[data-screen="lesson"] .app { padding-bottom:
   -webkit-backface-visibility: hidden; backface-visibility: hidden; text-align: center;
 }
 .face.back { transform: rotateY(180deg); justify-content: flex-start; padding-top: 30px; overflow-y: auto; }
-.face .big { font: 800 clamp(2.2rem, 11vw, 3rem)/1.1 var(--en); letter-spacing: -.01em; overflow-wrap: anywhere; }
-.face .hint { color: var(--faint); font-size: .82rem; font-weight: 700; position: absolute; bottom: 16px; }
-.face .meaning { font-size: 1.45rem; font-weight: 800; }
+.face .big { font: 700 clamp(2.2rem, 11vw, 3rem)/1.1 var(--en); letter-spacing: -.01em; overflow-wrap: anywhere; }
+.face .hint { color: var(--faint); font-size: .82rem; font-weight: 600; position: absolute; bottom: 16px; }
+.face .meaning { font-size: 1.45rem; font-weight: 700; }
 .face .ex { text-align: left; width: 100%; }
 .stamp { position: absolute; top: 22px; padding: 4px 14px; border-radius: 10px; font-weight: 800; font-size: 1.05rem; opacity: 0; border: 3px solid; pointer-events: none; }
 .stamp.know { left: 20px; color: var(--good); transform: rotate(-12deg); }
@@ -544,15 +556,15 @@ body[data-screen="quiz"] .app, body[data-screen="lesson"] .app { padding-bottom:
 .deck-actions { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: center; margin-top: 30px; }
 .deck-done { text-align: center; display: grid; gap: 12px; padding: 26px 18px; border-radius: 24px; background: var(--surface); box-shadow: var(--shadow); margin-top: 18px; }
 .deck-done h2 { font-size: 1.3rem; }
-.deck-done .nums { display: flex; justify-content: center; gap: 18px; font-weight: 800; }
-.deck-done .nums b { font: 800 1.8rem var(--en); display: block; }
+.deck-done .nums { display: flex; justify-content: center; gap: 18px; font-weight: 700; }
+.deck-done .nums b { font: 700 1.8rem var(--en); display: block; }
 
 /* ── ミニ講義 ── */
 .lcard { min-height: 260px; padding: 22px 20px; border-radius: 24px; background: var(--surface); box-shadow: var(--shadow); }
-.lcard h2 { font-size: 1.25rem; font-weight: 800; line-height: 1.45; }
+.lcard h2 { font-size: 1.25rem; font-weight: 700; line-height: 1.45; }
 .lcard .lp { margin-top: 12px; white-space: pre-line; font-size: 1rem; line-height: 1.85; }
 .lcard .lex { margin-top: 16px; padding: 12px 14px; border-radius: 14px; background: var(--accent-soft); color: var(--accent-text); font: 700 1rem/1.6 var(--en); }
-.lcard .lno { font: 800 .8rem var(--en); color: var(--faint); letter-spacing: .06em; }
+.lcard .lno { font: 700 .8rem var(--sans); color: var(--accent-text); }
 .lesson-nav { display: grid; grid-template-columns: 1fr 1.6fr; gap: 12px; }
 
 /* ── 結果 ── */
@@ -563,21 +575,22 @@ body[data-screen="quiz"] .app, body[data-screen="lesson"] .app { padding-bottom:
 .score .ring-bar { stroke: url(#scoreGrad); }
 .score .ring-num b { font-size: 2.6rem; color: var(--text); }
 .score .ring-num small { color: var(--muted); font-size: .85rem; }
-.result-title { font-size: 1.2rem; font-weight: 800; text-align: center; }
-.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-.stat { padding: 12px 8px; border-radius: 16px; background: var(--surface); box-shadow: var(--shadow); text-align: center; }
-.stat b { display: block; font: 800 1.35rem/1.2 var(--en); font-variant-numeric: tabular-nums; }
-.stat small { color: var(--muted); font-size: .74rem; font-weight: 700; }
+.result-title { font-size: 1.2rem; font-weight: 700; text-align: center; }
+.stats, .summary { display: grid; grid-template-columns: repeat(3, 1fr); padding: 4px 0; border-radius: 18px; background: var(--surface); box-shadow: var(--shadow); }
+.stat { padding: 10px 8px; text-align: center; }
+.stat + .stat { border-left: 1px solid var(--line); }
+.stat b { display: block; font: 700 1.35rem/1.2 var(--en); font-variant-numeric: tabular-nums; }
+.stat small { color: var(--muted); font-size: .74rem; font-weight: 500; }
 .xpbox { padding: 14px 16px; border-radius: 18px; background: var(--surface); box-shadow: var(--shadow); }
-.xp-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; font-weight: 800; }
+.xp-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; font-weight: 700; }
 .xp-top span { color: var(--sun-text); font-family: var(--en); }
-.goal-banner { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px; border-radius: 16px; background: var(--sun); color: #3d2a00; font-weight: 800; }
-.lvup { position: fixed; left: 50%; top: 40%; z-index: 40; padding: 14px 26px; border-radius: 22px; background: var(--sun); color: #3d2a00; font: 800 1.6rem var(--en); box-shadow: 0 20px 40px -18px rgba(0, 0, 0, .5); pointer-events: none; white-space: nowrap; }
+.goal-banner { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 2px; color: var(--sun-text); font-weight: 700; }
+.lvup { position: fixed; left: 50%; top: 40%; z-index: 40; padding: 14px 26px; border-radius: 22px; background: var(--sun); color: #3d2a00; font: 700 1.6rem var(--en); box-shadow: 0 20px 40px -18px rgba(0, 0, 0, .5); pointer-events: none; white-space: nowrap; }
 .missed details { padding: 12px 14px; border-radius: 16px; background: var(--surface); box-shadow: var(--shadow); }
 .missed details + details { margin-top: 8px; }
 .missed summary { cursor: pointer; font-family: var(--serif); line-height: 1.5; list-style: none; }
 .missed summary::-webkit-details-marker { display: none; }
-.missed summary small { display: block; font-family: var(--sans); color: var(--good-text); font-weight: 800; margin-top: 2px; }
+.missed summary small { display: block; font-family: var(--sans); color: var(--good-text); font-weight: 700; margin-top: 2px; }
 .missed details p { margin-top: 8px; font-size: .92rem; }
 /* 結果の「まちがえた問題」：あなたの答え（赤）と正解（緑）を並べる */
 .missed summary .ans { display: block; margin-top: 4px; }
@@ -590,37 +603,36 @@ body[data-screen="quiz"] .app, body[data-screen="lesson"] .app { padding-bottom:
 .result-grid > div + div { margin-top: 16px; }
 
 /* ── 記録と設定 ── */
-.summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-/* ふつうの月のカレンダー。勉強した日だけ緑の丸、今日は輪で囲む */
+/* ふつうの月のカレンダー。勉強した日だけ薄い緑の丸、今日は輪で囲む */
 .cal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .cal-nav { display: flex; gap: 8px; }
 .cal-head h2 + .cal-nav { margin-top: 0; }
 .cal-nav .round-btn { width: 36px; height: 36px; }
 .cal-nav .round-btn .icon { width: 1.1rem; height: 1.1rem; }
 .cal-nav .round-btn:disabled { opacity: .35; }
-.cal-week { display: grid; grid-template-columns: repeat(7, 1fr); margin-top: 14px; font-size: .75rem; color: var(--faint); text-align: center; font-weight: 700; }
+.cal-week { display: grid; grid-template-columns: repeat(7, 1fr); margin-top: 14px; font-size: .75rem; color: var(--faint); text-align: center; font-weight: 600; }
 .cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px 2px; margin-top: 8px; }
-.cal span { justify-self: center; display: grid; place-items: center; width: 100%; max-width: 40px; aspect-ratio: 1; border-radius: 50%; font: 700 .9rem var(--en); color: var(--muted); font-variant-numeric: tabular-nums; }
-.cal span.done { background: var(--good); color: var(--on-good); }
+.cal span { justify-self: center; display: grid; place-items: center; width: 100%; max-width: 40px; aspect-ratio: 1; border-radius: 50%; font: 600 .9rem var(--en); color: var(--muted); font-variant-numeric: tabular-nums; }
+.cal span.done { background: var(--good-soft); color: var(--good-text); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--good) 45%, transparent); }
 /* 「today」はホームのレッスンのカードと名前がぶつかるので、cal-today にする */
 .cal span.cal-today { box-shadow: inset 0 0 0 2px var(--accent); color: var(--text); }
-.cal span.done.cal-today { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--good); color: var(--on-good); }
+.cal span.done.cal-today { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--good); color: var(--good-text); }
 .cal span.future { opacity: .35; }
-.cal-note { margin-top: 12px; color: var(--muted); font-size: .88rem; font-weight: 700; }
+.cal-note { margin-top: 12px; color: var(--muted); font-size: .88rem; font-weight: 500; }
 .cal-note b { color: var(--good-text); font-family: var(--en); font-size: 1.05rem; }
-.catbar { display: grid; grid-template-columns: 10.4em minmax(0, 1fr) 3.2em; gap: 10px; align-items: center; font-size: .86rem; font-weight: 700; }
+.catbar { display: grid; grid-template-columns: 10.4em minmax(0, 1fr) 3.2em; gap: 10px; align-items: center; font-size: .86rem; font-weight: 500; }
 .catbar + .catbar { margin-top: 8px; }
 .catbar b { font: 700 .8rem var(--en); color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
-.catbar span small { display: block; color: var(--muted); font-size: .72rem; font-weight: 600; line-height: 1.3; }
+.catbar span small { display: block; color: var(--muted); font-size: .72rem; font-weight: 500; line-height: 1.3; }
 .bar.bad i { background: var(--bad); }
 /* 記録の「苦手の傾向」（weak-） */
-.weak-lead { color: var(--muted); font-size: .88rem; font-weight: 600; }
-.weak-h { margin: 16px 0 8px; font-size: .86rem; font-weight: 800; }
-.weak-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); font-size: .88rem; font-weight: 700; line-height: 1.7; }
+.weak-lead { color: var(--muted); font-size: .88rem; font-weight: 500; }
+.weak-h { margin: 16px 0 8px; font-size: .86rem; font-weight: 700; }
+.weak-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); font-size: .88rem; font-weight: 500; line-height: 1.7; }
 .weak-list li:first-child { border-top: 0; padding-top: 2px; }
-.weak-list small { display: block; color: var(--muted); font-size: .75rem; font-weight: 600; line-height: 1.4; }
+.weak-list small { display: block; color: var(--muted); font-size: .75rem; font-weight: 500; line-height: 1.4; }
 .weak-list li > b { font: 700 .85rem var(--en); color: var(--bad-text); font-variant-numeric: tabular-nums; }
-.weak-en { font: 800 1rem var(--en); }
+.weak-en { font: 700 1rem var(--en); }
 .hist li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); font-size: .9rem; }
 .hist li:first-child { border-top: 0; }
 .hist small { color: var(--faint); display: block; font-size: .75rem; }
@@ -628,18 +640,18 @@ body[data-screen="quiz"] .app, body[data-screen="lesson"] .app { padding-bottom:
 .empty { color: var(--muted); font-size: .9rem; }
 .setting { padding: 12px 0; border-top: 1px solid var(--line); }
 .setting:first-of-type { border-top: 0; padding-top: 4px; }
-.setting-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-weight: 700; }
-.setting small { display: block; color: var(--muted); font-weight: 600; font-size: .8rem; margin-top: 2px; }
+.setting-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-weight: 600; }
+.setting small { display: block; color: var(--muted); font-weight: 500; font-size: .8rem; margin-top: 2px; }
 .setting .field { margin-top: 8px; min-height: 46px; font-size: 1rem; }
 .seg { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
 .sound-try { margin-top: 8px; font-size: .85rem; }
-.seg button { flex: 1; min-width: 3.4em; height: 40px; border-radius: 12px; background: var(--sunken); font-weight: 800; font-size: .88rem; color: var(--muted); transition: transform var(--spring-dur) var(--spring); }
+.seg button { flex: 1; min-width: 3.4em; height: 40px; border-radius: 12px; background: var(--sunken); font-weight: 600; font-size: .88rem; color: var(--muted); transition: transform var(--spring-dur) var(--spring); }
 .seg button:active, .seg button.is-pressed { transform: scale(.92); transition-duration: .08s; }
 .seg button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
 .switch { position: relative; flex: none; width: 54px; height: 32px; border-radius: 99px; background: var(--sunken); box-shadow: inset 0 0 0 2px var(--line); transition: background-color .25s; }
 .switch::after { content: ""; position: absolute; left: 4px; top: 4px; width: 24px; height: 24px; border-radius: 50%; background: #fff; box-shadow: 0 2px 5px rgba(0, 0, 0, .25); transition: transform var(--spring-dur) var(--spring); }
 .switch[aria-checked="true"] { background: var(--accent); box-shadow: none; }
-.switch[aria-checked="true"]::after { transform: translateX(22px); }
+.switch[aria-checked="true"]::after { transform: translateX(22px); background: var(--on-accent); }
 textarea.field { min-height: 90px; padding: 12px 14px; font: .8rem/1.4 ui-monospace, Menlo, Consolas, monospace; resize: vertical; word-break: break-all; }
 .row-btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
 .row-btns .btn { min-height: 44px; font-size: .9rem; padding: 0 16px; }
@@ -650,7 +662,7 @@ textarea.field { min-height: 90px; padding: 12px 14px; font: .8rem/1.4 ui-monosp
 /* 使い方（開くと読める） */
 .faq details { border-top: 1px solid var(--line); padding: 10px 0; }
 .faq details:first-of-type { border-top: 0; padding-top: 2px; }
-.faq summary { cursor: pointer; font-weight: 800; list-style: none; display: flex; justify-content: space-between; gap: 12px; }
+.faq summary { cursor: pointer; font-weight: 700; list-style: none; display: flex; justify-content: space-between; gap: 12px; }
 .faq summary::-webkit-details-marker { display: none; }
 .faq summary::after { content: "＋"; color: var(--faint); font-weight: 700; }
 .faq details[open] summary::after { content: "－"; }
@@ -671,7 +683,7 @@ textarea.field { min-height: 90px; padding: 12px 14px; font: .8rem/1.4 ui-monosp
 .fx { position: fixed; inset: 0; z-index: 30; pointer-events: none; overflow: hidden; }
 .fx .bit { position: absolute; left: 0; top: 0; width: 9px; height: 14px; border-radius: 2px; will-change: transform; }
 .fx .bit.round { width: 10px; height: 10px; border-radius: 50%; }
-.fx .plus { position: absolute; left: 0; top: 0; font: 800 1.1rem var(--en); color: var(--sun-text); background: var(--sun-soft); padding: 2px 10px; border-radius: 99px; white-space: nowrap; }
+.fx .plus { position: absolute; left: 0; top: 0; font: 700 .95rem var(--en); color: var(--sun-text); text-shadow: 0 0 6px var(--surface), 0 0 2px var(--surface); white-space: nowrap; }
 
 /* ── 確認の小窓 ── */
 dialog.ask {
@@ -737,7 +749,7 @@ html.calm *, html.calm *::before, html.calm *::after { transition-duration: .01s
 <body class="no-tabs">
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
   <defs>
-    <linearGradient id="scoreGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#11906a"/><stop offset="1" stop-color="#47d3a0"/></linearGradient>
+    <linearGradient id="scoreGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" style="stop-color: var(--score-a)"/><stop offset="1" style="stop-color: var(--score-b)"/></linearGradient>
     <symbol id="i-home" viewBox="0 0 24 24"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.8V20h12V9.8"/><path d="M10 20v-5h4v5"/></symbol>
     <!-- 単語：英語の「A」と、その意味の「あ」（「あ」は線で描くとつぶれて見えるので、端末の書体の太字に細いふちを足す） -->
     <symbol id="i-words" viewBox="0 0 24 24"><path d="M2.4 18.6 6.4 6.6l4 12"/><path d="M3.8 14.4h5.2"/><text x="17.4" y="19.1" text-anchor="middle" fill="currentColor" stroke="currentColor" stroke-width=".55" stroke-linejoin="round" style="font: 700 14px &quot;Hiragino Sans&quot;, &quot;Hiragino Kaku Gothic ProN&quot;, &quot;Noto Sans JP&quot;, &quot;Yu Gothic UI&quot;, Meiryo, sans-serif">あ</text></symbol>
@@ -825,7 +837,7 @@ html.calm *, html.calm *::before, html.calm *::after { transition-duration: .01s
         <section class="card rise">
           <h2 id="path-title">750点への道のり</h2>
           <div>
-            <div class="path-row"><span>単語</span><i class="bar sun"><i id="path-words"></i></i><b id="path-words-n"></b></div>
+            <div class="path-row"><span>単語</span><i class="bar"><i id="path-words"></i></i><b id="path-words-n"></b></div>
             <div class="path-row"><span>文法</span><i class="bar"><i id="path-grammar"></i></i><b id="path-grammar-n"></b></div>
             <p class="path-note">単語は3回続けて正解すると「定着」、文法は最後に正解した問題を数えます。</p>
           </div>
