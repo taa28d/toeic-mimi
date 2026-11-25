@@ -49,7 +49,7 @@
   // 耳：顔の横の小さな丸。耳の下の端を軸に揺れる
   const ear = (x, side) => `
     <g transform="translate(${x} 79.6)"><g class="m-ear-mood"><g class="m-ear-swing"><g class="m-ear-idle m-ear-${side}">
-      <circle cx="0" cy="-12.6" r="12.6" fill="${FUR_DARK}"/>
+      <circle class="m-fur2" cx="0" cy="-12.6" r="12.6" fill="${FUR_DARK}"/>
     </g></g></g></g>`;
   // 目：ふだんは点の目。にっこり（happy）と、やさしい目（calm）は線で描く
   const EY = 74.2;
@@ -70,20 +70,22 @@
   <g class="m-jump">
     <g class="m-squash"><g class="m-breathe">
       <g transform="translate(140 188)"><g class="m-tail-mood"><g class="m-tail-swing"><g class="m-tail">
-        <path d="M-7.6 -2.2 C23 -2.2 42.8 -13 55.4 -32.8" fill="none" stroke="${FUR_DARK}" stroke-width="15.3" stroke-linecap="round"/>
+        <path class="m-fur2s" d="M-7.6 -2.2 C23 -2.2 42.8 -13 55.4 -32.8" fill="none" stroke="${FUR_DARK}" stroke-width="15.3" stroke-linecap="round"/>
       </g></g></g></g>
-      <g transform="translate(50.5 128)"><g class="m-arm m-arm-l"><rect x="-9.9" y="0" width="19.8" height="37.8" rx="9.9" fill="${FUR_DARK}"/></g></g>
-      <g transform="translate(149.5 128)"><g class="m-arm m-arm-r"><rect x="-9.9" y="0" width="19.8" height="37.8" rx="9.9" fill="${FUR_DARK}"/></g></g>
-      <rect x="64" y="191.2" width="27" height="14.4" rx="7.2" fill="${FUR_DARK}"/>
-      <rect x="109" y="191.2" width="27" height="14.4" rx="7.2" fill="${FUR_DARK}"/>
-      <rect x="47.8" y="104.8" width="104.4" height="93.6" rx="45" fill="${FUR}"/>
+      <g transform="translate(50.5 128)"><g class="m-arm m-arm-l"><rect class="m-fur2" x="-9.9" y="0" width="19.8" height="37.8" rx="9.9" fill="${FUR_DARK}"/></g></g>
+      <g transform="translate(149.5 128)"><g class="m-arm m-arm-r"><rect class="m-fur2" x="-9.9" y="0" width="19.8" height="37.8" rx="9.9" fill="${FUR_DARK}"/><g class="m-acc-hand"></g></g></g>
+      <rect class="m-fur2" x="64" y="191.2" width="27" height="14.4" rx="7.2" fill="${FUR_DARK}"/>
+      <rect class="m-fur2" x="109" y="191.2" width="27" height="14.4" rx="7.2" fill="${FUR_DARK}"/>
+      <rect class="m-fur" x="47.8" y="104.8" width="104.4" height="93.6" rx="45" fill="${FUR}"/>
       <rect x="74.8" y="130" width="50.4" height="63" rx="25.2" fill="${MUZZLE}"/>
       ${ear(34.3, 'l')}
       ${ear(165.7, 'r')}
-      <path d="${HEAD}" fill="${FUR}"/>
+      <path class="m-fur" d="${HEAD}" fill="${FUR}"/>
       <path clip-path="url(#mimiHeadClip)" d="${MASK}" fill="${MUZZLE}"/>
       <path class="m-tie" d="M94.6 127.4 H105.4 L104 133.6 H96 Z"/>
       <path class="m-tie" d="M96 133.6 H104 L108 153.6 L100 161 L92 153.6 Z"/>
+      <!-- 着せ替え：首もと・頭の上（頭と体といっしょに動く） -->
+      <g class="m-acc-neck"></g><g class="m-acc-head"></g>
       <g class="m-face"><g class="m-shake">
         <g class="m-brows" opacity="0">
           <path class="m-brow-l" d="M70 63 L83.2 63" stroke="${INK}" stroke-width="3.2" stroke-linecap="round"/>
@@ -98,6 +100,7 @@
         <!-- 口は MorphSVG で形を変える。形のデータは前の大きさのまま、ここで横を少しせまく・少し下へ -->
         <g transform="translate(22 4.2) scale(.78 1)"><path class="m-mouth" d="${MOUTH.smile}" fill="${MOUTH_FILL}"/></g>
         <path class="m-sweat" d="M156 36 Q163 47 156 51 Q149 47 156 36 Z" fill="#9bd8ff" opacity="0"/>
+        <g class="m-acc-face"></g>
       </g></g>
     </g></g>
     <g class="m-fx">
@@ -479,10 +482,41 @@
       return tl;
     }
 
+    /* ── 着せ替え ──
+       outfit：{ head, face, neck, hand }（closet.js のアイテム。svg と hideTie）、tie（ネクタイの色。'' でいつもの紺）、
+       fur（[頭と体, 耳・手足・しっぽ] の色。null でいつものミルクティー） */
+    const acc = { head: one('.m-acc-head'), face: one('.m-acc-face'), neck: one('.m-acc-neck'), hand: one('.m-acc-hand') };
+    function dress(outfit = {}) {
+      for (const slot of Object.keys(acc)) acc[slot].innerHTML = outfit[slot] ? outfit[slot].svg : '';
+      const hideTie = Boolean(outfit.neck && outfit.neck.hideTie);
+      all('.m-tie').forEach(t => { t.style.display = hideTie ? 'none' : ''; t.style.fill = outfit.tie || ''; });
+      const fur = outfit.fur;
+      all('.m-fur').forEach(el => { el.style.fill = fur ? fur[0] : ''; });
+      all('.m-fur2').forEach(el => { el.style.fill = fur ? fur[1] : ''; });
+      all('.m-fur2s').forEach(el => { el.style.stroke = fur ? fur[1] : ''; });
+    }
+
     return {
       el: host, svg, setMood, mood: () => mood, look, lookAt, lockGaze,
       hop, cheer, oops, surprise, hurry, poke, wave, enter, say, sparkle, mark,
-      startIdle, stopIdle,
+      startIdle, stopIdle, dress,
     };
+  };
+
+  // 着せ替えの一覧に出す、動かない小さなミミ（SVG の文字列）。腕は動くミミと同じ角度にひらく。
+  // 1つの画面に何枚も並ぶので、切り抜き（clipPath）の id は1枚ずつ変える
+  let staticN = 0;
+  window.mimiStatic = function mimiStatic(outfit = {}, viewBox = '0 0 200 214') {
+    let s = SVG.trim().replace(/mimiHeadClip/g, `mimiHeadClipS${++staticN}`)
+      .replace('class="mimi-svg" viewBox="0 0 200 214"', `class="mimi-static" viewBox="${viewBox}"`)
+      .replace('<g class="m-arm m-arm-l">', '<g class="m-arm m-arm-l" transform="rotate(35 0 2.3)">')
+      .replace('<g class="m-arm m-arm-r">', '<g class="m-arm m-arm-r" transform="rotate(-35 0 2.3)">');
+    for (const slot of ['head', 'face', 'neck', 'hand']) {
+      if (outfit[slot]) s = s.replace(`<g class="m-acc-${slot}"></g>`, `<g class="m-acc-${slot}">${outfit[slot].svg}</g>`);
+    }
+    if (outfit.neck && outfit.neck.hideTie) s = s.replace(/<path class="m-tie"/g, '<path class="m-tie" display="none"');
+    else if (outfit.tie) s = s.replace(/<path class="m-tie"/g, `<path class="m-tie" style="fill:${outfit.tie}"`);
+    if (outfit.fur) s = s.split(FUR_DARK).join(outfit.fur[1]).split(FUR).join(outfit.fur[0]);
+    return s;
   };
 })();

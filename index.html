@@ -39,7 +39,7 @@
   /* すりガラスのタブ：ガラスの色・上のふちの光・ふち線・影・選んでいるタブのレンズ */
   /* 明るい画面では白いカードや背景に溶けないよう、ふち線と影をはっきりさせ、レンズにアクセントの薄い青を入れる */
   --glass: rgba(250, 248, 252, .74); --glass-hi: rgba(255, 255, 255, .95); --glass-line: rgba(47, 39, 71, .12);
-  --glass-shade: rgba(47, 39, 71, .42); --lens: rgba(229, 231, 242, .96); --lens-hi: rgba(255, 255, 255, .9);
+  --glass-shade: rgba(47, 39, 71, .42); --lens: color-mix(in srgb, var(--a-soft) 96%, transparent); --lens-hi: rgba(255, 255, 255, .9);
 
   --bg: #f6f1e7;
   --surface: #fffdf8;
@@ -49,13 +49,17 @@
   --text: #1f2233;
   --muted: #5b5e70;
   --faint: #6a6c7e;   /* 生成りの地で文字の読みやすさ 4.5:1 以上 */
-  /* 主役の色は、アプリのアイコンの地と同じ「くすんだ紺」。文字に使う紺はアイコンのカードの文字の色 */
-  --navy: #33406f;
-  --accent: #33406f;
-  --accent-2: #4a5688;
+  /* テーマの色（設定で選べる）。いつもは、アプリのアイコンの地と同じ「くすんだ紺」。
+     --a-main：明るい画面の主の色（白い文字をのせる）、--a-text：その色の文字、--a-soft：うすい地、
+     --a-main-d・--a-text-d・--a-soft-d：暗い画面用、--a-ink-d：暗い画面の紙の色のボタンにのせる文字。色ごとの値は下の [data-accent] */
+  --a-main: #33406f; --a-main-2: #4a5688; --a-text: #2f3f8f; --a-soft: #e5e7f0;
+  --a-main-d: #2e3966; --a-text-d: #c3ccf2; --a-soft-d: #2f3760; --a-ink-d: #26305a;
+  --navy: var(--a-main);
+  --accent: var(--a-main);
+  --accent-2: var(--a-main-2);
   --on-accent: #ffffff;
-  --accent-soft: #e5e7f0;
-  --accent-text: #2f3f8f;
+  --accent-soft: var(--a-soft);
+  --accent-text: var(--a-text);
   /* 山吹は「おすすめ・苦手・XP」だけに使う */
   --sun: #f2b43c;
   --sun-soft: #fbefd2;
@@ -74,9 +78,9 @@
   --pink: #f2638b;
   --tie: #34449a; /* ミミのネクタイ（くすんだ紺） */
   /* 品詞の札の色（名詞・動詞・形容詞・副詞）。白い地で 4.5:1 以上 */
-  --paper: #fffaf2; --paper-ink: #2f3f8f; /* 紺の上にのせる、アイコンの紙の色のボタン */
+  --paper: #fffaf2; --paper-ink: var(--a-text); /* 紺の上にのせる、アイコンの紙の色のボタン */
   --score-a: #277a5c; --score-b: #4fae86; /* 結果の輪 */
-  --pos-n: #2f3f8f; --pos-v: #7a3fc4; --pos-a: #855600; --pos-d: #0b6a74;
+  --pos-n: var(--a-text); --pos-v: #7a3fc4; --pos-a: #855600; --pos-d: #0b6a74;
   --shadow: 0 1px 0 rgba(47, 39, 71, .05), 0 12px 30px -18px rgba(47, 39, 71, .35);
   --blob-1: #f3d9b9;
   --blob-2: #d3d7e8;
@@ -95,16 +99,16 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     /* 暗い画面：夜のノート。地は少し暖かい紺、文字は生成り、主役のボタンはアイコンの紙の色 */
-    --navy: #2e3966;
+    --navy: var(--a-main-d);
     --bg: #1a1f33; --surface: #242a42; --surface-2: #2a3150; --sunken: #313857; --line: #414a6e;
     --text: #f4eee3; --muted: #c9c1b2; --faint: #a39c8f;
-    --accent: #efe5d2; --accent-2: #f7efe0; --on-accent: #26305a; --accent-soft: #2f3760; --accent-text: #c3ccf2;
+    --accent: #efe5d2; --accent-2: #f7efe0; --on-accent: var(--a-ink-d); --accent-soft: var(--a-soft-d); --accent-text: var(--a-text-d);
     --sun: #f2c45a; --sun-soft: #3f3420; --sun-text: #f6d488;
     --good: #5cc29b; --good-soft: #1d3a33; --good-text: #93dcc0; --on-good: #0d2a20;
     --bad: #f08a74; --bad-soft: #43271f; --bad-text: #ffb7a6; --on-bad: #3a120a;
     --warn: #ffab4a; --warn-text: #ffb760; --pink: #ff86a8; --tie: #4456b0;
-    --paper: #efe5d2; --paper-ink: #26305a; --score-a: #3f9f7a; --score-b: #6fd0a8;
-    --pos-n: #c3ccf2; --pos-v: #d2b8ff; --pos-a: #ffd67c; --pos-d: #86dde5;
+    --paper: #efe5d2; --paper-ink: var(--a-ink-d); --score-a: #3f9f7a; --score-b: #6fd0a8;
+    --pos-n: var(--a-text-d); --pos-v: #d2b8ff; --pos-a: #ffd67c; --pos-d: #86dde5;
     --shadow: 0 1px 0 rgba(0, 0, 0, .25), 0 16px 34px -20px rgba(0, 0, 0, .8);
     --blob-1: #3a3350; --blob-2: #243a6a; --blob-3: #47304a;
     --glass: rgba(34, 38, 64, .52); --glass-hi: rgba(255, 255, 255, .22); --glass-line: rgba(255, 255, 255, .1);
@@ -113,22 +117,30 @@
   }
 }
 :root[data-theme="dark"] {
-  --navy: #2e3966;
+  --navy: var(--a-main-d);
   --bg: #1a1f33; --surface: #242a42; --surface-2: #2a3150; --sunken: #313857; --line: #414a6e;
   --text: #f4eee3; --muted: #c9c1b2; --faint: #a39c8f;
-  --accent: #efe5d2; --accent-2: #f7efe0; --on-accent: #26305a; --accent-soft: #2f3760; --accent-text: #c3ccf2;
+  --accent: #efe5d2; --accent-2: #f7efe0; --on-accent: var(--a-ink-d); --accent-soft: var(--a-soft-d); --accent-text: var(--a-text-d);
   --sun: #f2c45a; --sun-soft: #3f3420; --sun-text: #f6d488;
   --good: #5cc29b; --good-soft: #1d3a33; --good-text: #93dcc0; --on-good: #0d2a20;
   --bad: #f08a74; --bad-soft: #43271f; --bad-text: #ffb7a6; --on-bad: #3a120a;
   --warn: #ffab4a; --warn-text: #ffb760; --pink: #ff86a8; --tie: #4456b0;
-  --paper: #efe5d2; --paper-ink: #26305a; --score-a: #3f9f7a; --score-b: #6fd0a8;
-  --pos-n: #c3ccf2; --pos-v: #d2b8ff; --pos-a: #ffd67c; --pos-d: #86dde5;
+  --paper: #efe5d2; --paper-ink: var(--a-ink-d); --score-a: #3f9f7a; --score-b: #6fd0a8;
+  --pos-n: var(--a-text-d); --pos-v: #d2b8ff; --pos-a: #ffd67c; --pos-d: #86dde5;
   --shadow: 0 1px 0 rgba(0, 0, 0, .25), 0 16px 34px -20px rgba(0, 0, 0, .8);
   --blob-1: #3a3350; --blob-2: #243a6a; --blob-3: #47304a;
   --glass: rgba(34, 38, 64, .52); --glass-hi: rgba(255, 255, 255, .22); --glass-line: rgba(255, 255, 255, .1);
   --glass-shade: rgba(0, 0, 0, .6); --lens: rgba(255, 255, 255, .13); --lens-hi: rgba(255, 255, 255, .3);
   color-scheme: dark;
 }
+
+/* テーマの色（設定の「見た目」）。どれも、白い文字・その色の文字が 4.5:1 以上になる、くすんだ色 */
+:root[data-accent="green"] { --a-main: #2f5d4e; --a-main-2: #44715f; --a-text: #2a6a54; --a-soft: #dfece5; --a-main-d: #24463b; --a-text-d: #a8dcc6; --a-soft-d: #233d35; --a-ink-d: #1f3d33; }
+:root[data-accent="teal"] { --a-main: #2b6170; --a-main-2: #407585; --a-text: #24606f; --a-soft: #dcebee; --a-main-d: #21495a; --a-text-d: #a7d8e3; --a-soft-d: #213f4a; --a-ink-d: #1c4352; }
+:root[data-accent="grape"] { --a-main: #54456f; --a-main-2: #685a84; --a-text: #5a4682; --a-soft: #e9e4f1; --a-main-d: #3f3557; --a-text-d: #d1c3ee; --a-soft-d: #352f4c; --a-ink-d: #3a2f55; }
+:root[data-accent="wine"] { --a-main: #7a3344; --a-main-2: #8e4a5a; --a-text: #8a3348; --a-soft: #f3e1e5; --a-main-d: #5a2633; --a-text-d: #f0b8c5; --a-soft-d: #45252f; --a-ink-d: #4a1f2a; }
+:root[data-accent="sakura"] { --a-main: #a14f68; --a-main-2: #b4667d; --a-text: #9a4560; --a-soft: #f6e3e8; --a-main-d: #6e3446; --a-text-d: #f5bccb; --a-soft-d: #4a2a35; --a-ink-d: #5a2338; }
+:root[data-accent="cocoa"] { --a-main: #6b4f3f; --a-main-2: #7f6353; --a-text: #6e4c38; --a-soft: #efe4da; --a-main-d: #4a3a30; --a-text-d: #e6c7ae; --a-soft-d: #3e342e; --a-ink-d: #3d2d23; }
 
 *, *::before, *::after { box-sizing: border-box; }
 [hidden] { display: none !important; }
@@ -196,7 +208,7 @@ body[data-screen="quiz"] .app, body[data-screen="lesson"] .app { padding-bottom:
 .btn:disabled { opacity: .45; }
 .btn.ghost { background: var(--surface); color: var(--text); box-shadow: inset 0 0 0 2px var(--line); }
 .btn.ghost:active:not(:disabled), .btn.ghost.is-pressed:not(:disabled) { box-shadow: inset 0 0 0 2px var(--line); }
-.btn.white { background: var(--paper); color: var(--paper-ink); box-shadow: 0 4px 0 -1px #1d254a; }
+.btn.white { background: var(--paper); color: var(--paper-ink); box-shadow: 0 4px 0 -1px color-mix(in srgb, var(--navy) 55%, #000); }
 .btn.good { background: var(--good); color: var(--on-good); box-shadow: 0 5px 0 -1px color-mix(in srgb, var(--good) 60%, #000); }
 .btn.bad { background: var(--surface); color: var(--bad-text); box-shadow: inset 0 0 0 2px var(--bad); }
 .btn.wide { width: 100%; }
@@ -720,6 +732,45 @@ html.bars-themed body.no-tabs .navfade {
 html.scrolled .topfade { opacity: 1; }
 #saProbe { position: fixed; top: 0; left: 0; width: 0; visibility: hidden; pointer-events: none; padding: var(--sa-top) 0 var(--sa-bottom); }
 
+/* ── 設定：テーマの色（丸い色見本から選ぶ） ── */
+.swatches { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 12px 2px; margin-top: 10px; }
+.swatches button { display: grid; justify-items: center; gap: 5px; font-size: .74rem; font-weight: 600; color: var(--muted); }
+.swatches i { width: 34px; height: 34px; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 3px var(--surface), 0 0 0 4.5px transparent; transition: box-shadow .2s, transform var(--spring-dur) var(--spring); }
+.swatches button:active i, .swatches button.is-pressed i { transform: scale(.88); transition-duration: .08s; }
+.swatches button[aria-checked="true"] i { box-shadow: 0 0 0 3px var(--surface), 0 0 0 5.5px var(--c); }
+.swatches button[aria-checked="true"] span { color: var(--text); }
+
+/* ── ミミの着せ替え（closet-） ── */
+.mimi-static { display: block; width: 100%; height: 100%; overflow: visible; }
+.mimi-static .m-tie { fill: var(--tie); }
+.closet-card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.closet-card-head h2 + * { margin-top: 0; }
+.badge-new { padding: 1px 10px; border-radius: 99px; background: var(--bad-soft); color: var(--bad-text); font-size: .74rem; font-weight: 700; white-space: nowrap; }
+.closet-card-row { display: flex; gap: 6px; margin: 10px 0 12px; overflow: hidden; }
+.closet-card-row .closet-thumb { width: 54px; height: 48px; padding: 4px; border-radius: 12px; background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line); }
+.closet-head { display: grid; grid-template-columns: 42px minmax(0, 1fr) auto; align-items: center; gap: 12px; }
+.closet-head h1 { font-size: 1.1rem; font-weight: 700; text-align: center; }
+.closet-stage .mimi-spot { width: 150px; }
+.closet-tabs { display: flex; gap: 6px; overflow-x: auto; padding: 3px 2px; margin: 0 -2px; scrollbar-width: none; }
+.closet-tabs::-webkit-scrollbar { display: none; }
+.closet-tab { position: relative; flex: none; height: 38px; padding: 0 14px; border-radius: 99px; background: var(--surface); box-shadow: inset 0 0 0 1.5px var(--line); font-size: .86rem; font-weight: 600; color: var(--muted); }
+.closet-tab[aria-selected="true"] { background: var(--accent); color: var(--on-accent); box-shadow: none; }
+.closet-tab .dot { position: absolute; top: 5px; right: 7px; width: 7px; height: 7px; border-radius: 50%; background: var(--bad); }
+.closet-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; }
+.closet-item { display: grid; justify-items: center; align-content: start; gap: 3px; padding: 10px 6px 12px; border-radius: 16px; background: var(--surface); box-shadow: var(--shadow), inset 0 0 0 1.5px var(--line); text-align: center; transition: transform var(--spring-dur) var(--spring); }
+.closet-item:active, .closet-item.is-pressed { transform: scale(.95); transition-duration: .08s; }
+.closet-item[aria-pressed="true"] { background: var(--accent-soft); box-shadow: var(--shadow), inset 0 0 0 2.5px var(--accent-text); }
+.closet-thumb { display: grid; place-items: center; width: 76px; height: 64px; }
+.closet-thumb .mimi-static { overflow: hidden; }
+.closet-item b { font-size: .78rem; font-weight: 600; line-height: 1.35; }
+.closet-item small { font-size: .68rem; font-weight: 500; color: var(--faint); line-height: 1.35; }
+.closet-item small.new { color: var(--bad-text); font-weight: 700; }
+.closet-item.locked .closet-thumb { filter: grayscale(1); opacity: .32; }
+.closet-item.locked b { color: var(--faint); }
+.closet-got-list { display: flex; flex-wrap: wrap; gap: 8px 10px; margin: 10px 0 14px; }
+.closet-got-item { display: grid; justify-items: center; gap: 2px; width: 84px; font-size: .74rem; font-weight: 600; line-height: 1.35; text-align: center; }
+.closet-got-item .closet-thumb { width: 64px; height: 56px; }
+
 /* ── 広い画面：2列 ── */
 @media (min-width: 820px) and (min-height: 480px) {
   .screen.home, .screen.quiz, .screen.result { max-width: 980px; }
@@ -974,6 +1025,12 @@ html.calm *, html.calm *::before, html.calm *::after { transition-duration: .01s
           <div class="xp-top"><b id="result-lv">Lv.1</b><span id="result-xp">+0 XP</span></div>
           <i class="bar sun"><i id="result-xpbar"></i></i>
         </div>
+        <!-- 新しくもらった着せ替え（レベルや連続日数のごほうび） -->
+        <section class="card closet-got rise" id="result-closet" hidden>
+          <h2>新しい着せ替え</h2>
+          <div class="closet-got-list" id="result-closet-list"></div>
+          <button class="btn ghost wide" id="result-closet-go" type="button">きせかえる</button>
+        </section>
         <section class="missed rise" id="result-missed"></section>
         <div class="tip rise" id="result-next" hidden>
           <svg class="icon"><use href="#i-bulb"/></svg>
@@ -995,6 +1052,12 @@ html.calm *, html.calm *::before, html.calm *::after { transition-duration: .01s
       <div class="bubble small" data-tail="left" aria-hidden="true"><p class="bubble-text"></p></div>
     </div>
     <div class="summary rise" id="records-summary"></div>
+    <section class="card closet-card rise">
+      <div class="closet-card-head"><h2>ミミのきせかえ</h2><span class="badge-new" id="closet-new" hidden></span></div>
+      <p class="note" id="closet-note"></p>
+      <div class="closet-card-row" id="closet-peek" aria-hidden="true"></div>
+      <button class="btn ghost wide" id="closet-open" type="button">きせかえる</button>
+    </section>
     <section class="card rise">
       <div class="cal-head">
         <h2 id="cal-title">勉強した日</h2>
@@ -1012,6 +1075,23 @@ html.calm *, html.calm *::before, html.calm *::after { transition-duration: .01s
     <section class="card rise"><h2>最近の記録</h2><ul class="hist" id="records-hist"></ul></section>
   </section>
 
+  <!-- ミミの着せ替え（プロフィールから開く。タブは出さない） -->
+  <section class="screen" id="s-closet" hidden>
+    <header class="closet-head rise">
+      <button class="round-btn" id="closet-back" type="button" aria-label="プロフィールへもどる"><svg class="icon"><use href="#i-back"/></svg></button>
+      <h1>ミミのきせかえ</h1>
+      <span class="counter" id="closet-count"></span>
+    </header>
+    <div class="stage closet-stage rise">
+      <div class="mimi-spot" role="button" tabindex="0" aria-label="ミミにさわる"></div>
+      <div class="bubble small" data-tail="left" aria-hidden="true"><p class="bubble-text"></p></div>
+    </div>
+    <div class="closet-tabs rise" id="closet-tabs" role="tablist" aria-label="アイテムの種類"></div>
+    <div class="closet-grid rise" id="closet-grid"></div>
+    <p class="note rise">ほかのアイテムは、レベルが上がったり、続けて勉強したりするともらえます。着ている物をもう一度押すと、はずせます。</p>
+    <button class="btn ghost wide rise" id="closet-reset" type="button">ぜんぶはずす</button>
+  </section>
+
   <!-- 設定（学習・音と動き・引き継ぎ・使い方・このアプリについて） -->
   <section class="screen" id="s-settings" hidden>
     <header class="page-head rise"><div><h1>設定</h1><p>学習のしかた、音、記録の引き継ぎ</p></div></header>
@@ -1025,6 +1105,22 @@ html.calm *, html.calm *::before, html.calm *::after { transition-duration: .01s
         <div class="setting"><label class="setting-row" for="set-name"><span>呼び名<small>ミミが呼ぶときの名前</small></span></label><input class="field" id="set-name" maxlength="12" placeholder="なし" autocomplete="nickname"></div>
         <div class="setting"><div class="setting-row">1日の目標</div><div class="seg" data-set="daily"><button type="button" data-v="10">10問</button><button type="button" data-v="20">20問</button><button type="button" data-v="30">30問</button></div></div>
         <div class="setting"><div class="setting-row">文法の1問の時間</div><div class="seg" data-set="timer"><button type="button" data-v="10">10秒</button><button type="button" data-v="15">15秒</button><button type="button" data-v="20">20秒</button><button type="button" data-v="30">30秒</button><button type="button" data-v="0">なし</button></div></div>
+      </div>
+    </section>
+    <section class="card rise">
+      <h2>見た目</h2>
+      <div>
+        <div class="setting"><div class="setting-row"><span>テーマの色<small>ボタンや「今日のレッスン」の色です。明るい・暗いは端末の設定に合わせます</small></span></div>
+          <div class="swatches" id="set-accent" role="radiogroup" aria-label="テーマの色">
+            <button type="button" role="radio" data-v="navy" style="--c: #33406f"><i></i><span>紺</span></button>
+            <button type="button" role="radio" data-v="green" style="--c: #2f5d4e"><i></i><span>深緑</span></button>
+            <button type="button" role="radio" data-v="teal" style="--c: #2b6170"><i></i><span>青緑</span></button>
+            <button type="button" role="radio" data-v="grape" style="--c: #54456f"><i></i><span>ぶどう</span></button>
+            <button type="button" role="radio" data-v="wine" style="--c: #7a3344"><i></i><span>えんじ</span></button>
+            <button type="button" role="radio" data-v="sakura" style="--c: #a14f68"><i></i><span>さくら</span></button>
+            <button type="button" role="radio" data-v="cocoa" style="--c: #6b4f3f"><i></i><span>ココア</span></button>
+          </div>
+        </div>
       </div>
     </section>
     <section class="card rise">
@@ -1125,6 +1221,7 @@ html.calm *, html.calm *::before, html.calm *::after { transition-duration: .01s
 <script src="js/lines.js"></script>
 <script src="voice/index.js"></script>
 <script src="js/mimi.js"></script>
+<script src="js/closet.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

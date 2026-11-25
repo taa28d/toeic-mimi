@@ -8,7 +8,7 @@
   const hasDraw = Boolean(window.DrawSVGPlugin);
   const hasPhysics = Boolean(window.Physics2DPlugin);
   if (window.CustomWiggle) window.CustomWiggle.create('errShake', { wiggles: 3, type: 'easeOut' });
-  const VERSION = '1.9.0';
+  const VERSION = '1.10.0';
   const NS = 'http://www.w3.org/2000/svg';
 
   const LINES = window.MIMI_LINES;
@@ -82,7 +82,10 @@
     const fresh = () => ({
       v: 1, onboarded: false, lastVisit: null,
       profile: { name: '', now: '', goal: 750, daily: 20 },
-      settings: { timer: 20, sound: true, music: true, voice: true, speak: true, speakAfter: true, motion: 'auto' },
+      settings: { timer: 20, sound: true, music: true, voice: true, speak: true, speakAfter: true, motion: 'auto', accent: 'navy' },
+      // 着せ替え：持っている物（owned）、着ている物（wear：場所ごとの id）、まだ見ていない新しい物（fresh）、
+      // 実戦20問で満点をとったか（perfect）、着せ替えを始めたことをミミが伝えたか（intro）
+      closet: { owned: [], wear: {}, fresh: [], perfect: false, intro: false },
       xp: 0, streak: { last: null, count: 0, best: 0 },
       days: {}, words: {}, gram: {}, history: [], seenLesson: {},
       // 最近の答え（新しいものが後ろ。最大 LOG_MAX 件）。[日, 'g'か'w', 問題の id, 正解なら1, まちがえたときに選んだもの]
@@ -111,6 +114,15 @@
   const prevVisit = store.data.lastVisit;
   store.data.lastVisit = dayNo();
   store.save();
+
+  // テーマの色（設定の「見た目」）。html の data-accent で CSS の色を切り替える。紺はいつもの色なので付けない
+  const ACCENTS = ['navy', 'green', 'teal', 'grape', 'wine', 'sakura', 'cocoa'];
+  function applyAccent() {
+    const a = store.data.settings.accent;
+    if (a && a !== 'navy' && ACCENTS.includes(a)) document.documentElement.dataset.accent = a;
+    else delete document.documentElement.dataset.accent;
+  }
+  applyAccent();
 
   /* ━━ 3. 動きの設定 ━━ */
   // 動き：auto は端末の「視差効果を減らす」に合わせる。full はいつも動かす、calm はいつも減らす
@@ -889,6 +901,158 @@
     spot.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); poke(); } });
   });
 
+  /* ━━ 7-2. ミミの着せ替え（レベルや連続日数のごほうび） ━━
+     アイテムは closet.js。持っている物・着ている物は store.data.closet。
+     季節の物（サンタ帽）は、その月だけ使える（持ち物には入れず、月で決める） */
+  const CLOSET = window.TOEIC_CLOSET || { items: [], tabs: [] };
+  const ITEM = new Map(CLOSET.items.map(it => [it.id, it]));
+  const isBasic = it => !Object.keys(it.unlock).length; // はじめから持っている物（いつものネクタイ・毛の色）
+  const inSeason = it => new Date().getMonth() + 1 === it.unlock.season;
+  function earned(it) {
+    const u = it.unlock;
+    if (u.season) return inSeason(it);
+    if (u.level) return levelInfo(store.data.xp).level >= u.level;
+    if (u.streak) return Math.max(store.data.streak.best || 0, currentStreak()) >= u.streak;
+    if (u.perfect) return Boolean(store.data.closet.perfect);
+    if (u.words) return WORDS.filter(wordLearned).length >= u.words;
+    return true;
+  }
+  const owns = it => isBasic(it) || (it.unlock.season ? inSeason(it) : store.data.closet.owned.includes(it.id));
+  // 新しく条件を満たした物を持ち物に入れ、入れた物を返す（結果の画面で知らせる）
+  function syncCloset() {
+    const c = store.data.closet;
+    const added = CLOSET.items.filter(it => !isBasic(it) && !it.unlock.season && !c.owned.includes(it.id) && earned(it));
+    added.forEach(it => { c.owned.push(it.id); c.fresh.push(it.id); });
+    if (added.length) store.save();
+    return added;
+  }
+  // いま着ている物。持っていない物・季節が終わった物は着ない
+  function outfit() {
+    const wear = store.data.closet.wear || {};
+    const worn = slot => { const it = ITEM.get(wear[slot]); return it && it.slot === slot && owns(it) ? it : null; };
+    const tie = worn('tie'), fur = worn('fur');
+    return { head: worn('head'), face: worn('face'), neck: worn('neck'), hand: worn('hand'), tie: tie ? tie.color : '', fur: fur ? fur.fur : null };
+  }
+  const applyOutfit = () => mimi.dress(outfit());
+  const isWorn = it => {
+    const id = store.data.closet.wear[it.slot];
+    if (it.slot === 'tie' || it.slot === 'fur') return id ? id === it.id : isBasic(it);
+    return id === it.id;
+  };
+  const unlockText = it => {
+    const u = it.unlock;
+    if (u.level) return `Lv.${u.level}でもらえる`;
+    if (u.streak) return `${u.streak}日連続でもらえる`;
+    if (u.perfect) return '実戦20問で満点をとるともらえる';
+    if (u.words) return `単語${u.words}語をぜんぶ定着させるともらえる`;
+    if (u.season) return `${u.season}月だけ使える`;
+    return '';
+  };
+  // 一覧の小さな絵：そのアイテムだけを着たミミの、アイテムのあたりを切り取る
+  const THUMB_VIEW = { head: '14 -34 172 140', face: '22 40 156 92', neck: '30 98 140 112', hand: '140 122 70 70', tie: '58 106 84 70', fur: '0 0 200 214' };
+  function thumb(it) {
+    const box = make('span', 'closet-thumb');
+    const wear = it.slot === 'tie' ? { tie: it.color } : it.slot === 'fur' ? { fur: it.fur } : { [it.slot]: it };
+    box.innerHTML = window.mimiStatic(wear, THUMB_VIEW[it.slot]);
+    return box;
+  }
+  const countable = () => CLOSET.items.filter(it => !isBasic(it));
+
+  let closetTab = 'band';
+  function openCloset() {
+    stopRound();
+    show('closet');
+    // 新しい物があるタブから見せる
+    const fresh = store.data.closet.fresh.map(id => ITEM.get(id)).filter(Boolean);
+    if (fresh.length) closetTab = fresh[0].tab;
+    renderCloset();
+    say(fresh.length ? `新しいのが${fresh.length}つあるよ。どれにしようかな。` : pick(['どれを着ようかな。', 'にあうの、選んでね。', '今日はどれにする？']));
+  }
+  function renderCloset() {
+    const c = store.data.closet;
+    $('closet-count').textContent = `${countable().filter(owns).length} / ${countable().length}`;
+    $('closet-tabs').replaceChildren(...CLOSET.tabs.map(t => {
+      const b = make('button', 'closet-tab', t.name);
+      b.type = 'button';
+      b.setAttribute('role', 'tab');
+      b.setAttribute('aria-selected', String(t.id === closetTab));
+      if (c.fresh.some(id => ITEM.get(id)?.tab === t.id)) b.append(make('i', 'dot'));
+      b.addEventListener('click', () => { if (closetTab !== t.id) { closetTab = t.id; renderCloset(); } });
+      return b;
+    }));
+    $('closet-grid').replaceChildren(...CLOSET.items.filter(it => it.tab === closetTab).map(it => {
+      const have = owns(it);
+      const b = make('button', `closet-item${have ? '' : ' locked'}`);
+      b.type = 'button';
+      b.setAttribute('aria-pressed', String(have && isWorn(it)));
+      b.append(thumb(it), make('b', null, it.name));
+      if (!have) b.append(make('small', null, unlockText(it)));
+      else if (c.fresh.includes(it.id)) b.append(make('small', 'new', '新しい'));
+      b.addEventListener('click', () => wearItem(it));
+      return b;
+    }));
+    // このタブの新しい物は、見たので印を消す（次に開いたときから）
+    const before = c.fresh.length;
+    c.fresh = c.fresh.filter(id => ITEM.get(id)?.tab !== closetTab);
+    if (c.fresh.length !== before) store.save();
+  }
+  function wearItem(it) {
+    if (!owns(it)) { mimi.setMood('think', { after: 1.6, then: 'smile' }); say(`${unlockText(it)}よ。いっしょにがんばろう！`); return; }
+    const wear = store.data.closet.wear;
+    const was = isWorn(it);
+    // ネクタイと毛の色はいつも1つ。ほかは、着ている物をもう一度押すとはずす
+    if (it.slot === 'tie' || it.slot === 'fur') wear[it.slot] = it.id;
+    else wear[it.slot] = was ? null : it.id;
+    store.save();
+    applyOutfit();
+    renderCloset();
+    if (was && it.slot !== 'tie' && it.slot !== 'fur') { say('はずしたよ。'); return; }
+    mimi.setMood('joy', { after: 1.4, then: 'smile' });
+    mimi.hop(14);
+    sound.play('pop');
+    say(pick(['にあう？', 'どうかな？', 'これ、好き！', `${it.name}、いいね！`]));
+  }
+  $('closet-back').addEventListener('click', openProfile);
+  $('closet-open').addEventListener('click', openCloset);
+  $('result-closet-go').addEventListener('click', openCloset);
+  $('closet-reset').addEventListener('click', () => {
+    store.data.closet.wear = {};
+    store.save();
+    applyOutfit();
+    renderCloset();
+    say('いつものミミにもどったよ。');
+  });
+  // プロフィールの「ミミのきせかえ」の札
+  function renderClosetCard() {
+    const c = store.data.closet;
+    const have = countable().filter(owns);
+    $('closet-note').textContent = have.length
+      ? `持っている物 ${have.length} / ${countable().length}。レベルが上がったり、続けて勉強したりすると増えていきます。`
+      : `Lv.2 で最初のアイテムがもらえます。レベルが上がったり、続けて勉強したりすると増えていきます（全${countable().length}こ）。`;
+    $('closet-new').hidden = !c.fresh.length;
+    $('closet-new').textContent = `新しい ${c.fresh.length}`;
+    const peek = (c.fresh.length ? c.fresh.map(id => ITEM.get(id)) : have.slice().reverse()).filter(Boolean).slice(0, 5);
+    $('closet-peek').replaceChildren(...peek.map(thumb));
+    $('closet-peek').hidden = !peek.length;
+  }
+  // 結果の画面：新しくもらった着せ替えを見せる（レベルアップの演出が終わるころに）
+  function showNewItems(added) {
+    const box = $('result-closet');
+    box.hidden = !added.length;
+    if (!added.length) return;
+    $('result-closet-list').replaceChildren(...added.map(it => {
+      const item = make('span', 'closet-got-item');
+      item.append(thumb(it), make('span', null, it.name));
+      return item;
+    }));
+    const line = added.length === 1 ? `「${added[0].name}」をもらったよ！着てみる？` : `新しい着せ替えを${added.length}つもらったよ！`;
+    if (calm()) { gsap.delayedCall(2.4, () => say(line)); return; }
+    gsap.fromTo(box, { y: 14, opacity: 0 }, { y: 0, opacity: 1, duration: .45, ease: 'power3.out', delay: 2.2, clearProps: 'transform,opacity' });
+    gsap.delayedCall(2.4, () => { say(line); mimi.setMood('joy', { after: 1.6, then: 'smile' }); });
+  }
+  syncCloset();
+  applyOutfit();
+
   /* ━━ 8. 背景の動き（いちばん奥。ゆっくり漂う） ━━ */
   let ambient = [];
   function setupAmbient() {
@@ -1004,6 +1168,7 @@
     if (current === 'quiz') { askQuit(); return; }
     if (current === 'cards') { openWords(); return; }
     if (current === 'lesson') { openGrammar(); return; }
+    if (current === 'closet') { openProfile(); return; }
     if (['words', 'grammar', 'profile', 'settings', 'result'].includes(current)) goHome(current === 'result');
   }
 
@@ -1228,6 +1393,12 @@
       if (prevVisit != null && dayNo() - prevVisit >= 2) return pick(LINES.back);
       const streak = currentStreak();
       if (streak >= 2) return fmt(pick(LINES.streak), { n: streak });
+    }
+    // 着せ替えを始めたことを、最初のアイテムを持っている人に一度だけ伝える
+    if (!store.data.closet.intro && store.data.closet.owned.length) {
+      store.data.closet.intro = true;
+      store.save();
+      return '着せ替えができるようになったよ！プロフィールの「きせかえる」から選んでね。';
     }
     if (todayStat().q >= goal) return pick(LINES.goalDone);
     if (after) return pick(['おかえり！つづけてやる？', 'いい調子！次は何をやろうか。', 'ひと休みしたら、またやろうね。']);
@@ -2093,13 +2264,17 @@
       store.data.history.length = Math.min(store.data.history.length, 40);
       store.save();
     }
+    // 着せ替え：実戦20問で満点なら「合格お守り」。レベルや連続日数で新しく増えた物は、結果の画面で知らせる
+    if (r.kind === 'drill' && n >= 20 && ok === n) store.data.closet.perfect = true;
+    const added = syncCloset();
     round = null;
     if (!n) { goHome(); return; }
     show('result');
-    renderResult(r, n, ok);
+    renderResult(r, n, ok, added);
   }
 
-  function renderResult(r, n, ok) {
+  function renderResult(r, n, ok, added = []) {
+    showNewItems(added);
     const rate = Math.round((ok / n) * 100);
     // 「実戦20問」のように題名に数が入っているときは、数を重ねて書かない
     const inTitle = r.title.match(/(\d+)問$/);
@@ -2623,6 +2798,7 @@
       [String(total), '解いた問題'],
       [total ? `${Math.round((right / total) * 100)}%` : '—', '正答率'],
     ];
+    renderClosetCard();
     $('records-summary').replaceChildren(...tiles.map(([value, label]) => {
       const box = make('div', 'stat');
       box.append(make('b', null, value), make('small', null, label));
@@ -2681,6 +2857,7 @@
       seg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === value)));
     });
     document.querySelectorAll('[data-toggle]').forEach(sw => sw.setAttribute('aria-checked', String(Boolean(d.settings[sw.dataset.toggle]))));
+    $('set-accent').querySelectorAll('button').forEach(b => b.setAttribute('aria-checked', String(b.dataset.v === (d.settings.accent || 'navy'))));
     $('about-version').textContent = `バージョン ${VERSION}　単語 ${WORDS.length}語　文法 ${GRAMMAR.length}問`;
     renderExportLast();
     renderInstall();
@@ -2831,6 +3008,18 @@
     if (key === 'music') { if (store.data.settings.music) bgm.start(); else bgm.stop(); }
   }));
   $('sound-try').addEventListener('click', () => sound.play('levelUp', null, { force: true }));
+  // テーマの色：押した色をすぐに画面全体へ
+  $('set-accent').addEventListener('click', e => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    store.data.settings.accent = btn.dataset.v;
+    store.save();
+    applyAccent();
+    $('set-accent').querySelectorAll('button').forEach(b => b.setAttribute('aria-checked', String(b === btn)));
+    if (!calm()) gsap.fromTo(btn.querySelector('i'), { scale: .8 }, { scale: 1, duration: .5, ease: 'elastic.out(1, .5)', clearProps: 'transform' });
+    mimi.hop(8);
+    say(pick(['この色、いいね！', 'いい感じ！', '気分が変わるね。']));
+  });
   function applyMotion() {
     syncMotion();
     setupAmbient();
@@ -2919,8 +3108,11 @@
     store.save();
     $('transfer').hidden = true;
     $('transfer-text').value = '';
-    // 読み込んだ記録の設定（動き・BGM）を、すぐ使う
+    // 読み込んだ記録の設定（動き・BGM・テーマの色）と着せ替えを、すぐ使う
     applyMotion();
+    applyAccent();
+    syncCloset();
+    applyOutfit();
     if (store.data.settings.music === false) bgm.stop();
     goHome();
     say('記録を引き継いだよ。おかえり！');
@@ -2975,6 +3167,8 @@
     store.reset();
     store.data.lastVisit = dayNo();
     store.save();
+    applyAccent();
+    applyOutfit();
     greeted = false;
     startWelcome();
   });
@@ -3136,7 +3330,7 @@
   if (window.__TOEIC_HOOK__) {
     window.__TOEIC_HOOK__({
       store, mimi, sound, WORDS, GRAMMAR, SETS, CATS, composeDaily, levelInfo, wordChoices, overlaps, senses,
-      startDaily, startDrill, startCatQuiz, startCards, openLesson, goHome, openWords, openGrammar, openProfile, openSettings,
+      startDaily, startDrill, startCatQuiz, startCards, openLesson, goHome, openWords, openGrammar, openProfile, openSettings, openCloset, syncCloset, outfit, applyAccent,
       answer: (i, timedOut) => answer(i, timedOut), rightIndex: () => round?.q?.choices?.findIndex(c => c.right) ?? -1,
       next: () => quizEls.next.click(), currentRound: () => round, currentScreen: () => current, deck: () => deck,
       catSkills, confusions, weakFocus, weakWords, nextGrammar, similarGrammar, openGloss, closeGloss,
