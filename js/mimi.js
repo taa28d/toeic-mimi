@@ -1,7 +1,8 @@
 /* ミミ：いっしょに勉強するキャラクター（カワウソ）。SVG で描き、GSAP で動かす。
-   見た目はアプリのアイコン（toeic-mimi-store/tools/icon-art.js）とそろえる：ミルクティー色の顔、白い口元、こげ茶の線、
-   横に付いた小さな耳、点の目と丸い鼻、ネクタイ。アイコンのクレヨン風のざらつき（SVG フィルター）は、
-   動かすたびに描き直しが重くなるので、ここでは使わない。
+   見た目（2026-11-25、ユーザーが選んだ「ロゴマークの顔＋フラット幾何学」）：線を使わず、色の面だけで描く。
+   顔は横長でミルクティー色、目の下からほおへまわる白い顔、点の目と幅の広い鼻、ωの口。
+   体は角丸の四角、白いおなか、角丸の手足、太く丸いしっぽ、紺のネクタイ。
+   ざらつき（SVG フィルター）は、動かすたびに描き直しが重くなるので使わない。
    動きの決まりごと（LottieFiles の motion-design-skill の考え方）：
    ・跳ぶ前に一度しゃがむ（予備動作）、着地でつぶれて戻る（つぶしと伸ばし）
    ・耳としっぽは体より遅れて揺れ、少し行きすぎて戻る（フォロースルー）
@@ -10,12 +11,11 @@
 (function () {
   'use strict';
 
-  const INK = '#5b3b33';      // こげ茶の線（目・鼻・口も）
-  const FUR = '#bea38c';      // ミルクティー色
-  const FUR_DARK = '#a88b74'; // 手足・しっぽの先
-  const MUZZLE = '#faf5ec';   // 口元・おなか
-  const EAR_IN = '#f3ebe0';
-  const STROKE = `stroke="${INK}" stroke-width="4.4" stroke-linejoin="round"`;
+  const INK = '#2b2230';      // 目・鼻・口・まゆ（体に線は使わない）
+  const FUR = '#b39577';      // ミルクティー色（頭・体）
+  const FUR_DARK = '#9a7d63'; // 耳・手足・しっぽ
+  const MUZZLE = '#fbf4e8';   // 顔の下・おなか
+  const MOUTH_FILL = '#3d2731';
 
   // 口の形。どれも閉じた形にして、MorphSVG でなめらかに変形させる（鼻の下、中心は 100,97）
   const MOUTH = {
@@ -47,75 +47,71 @@
 
   const star = (x, y, r) => `M${x} ${y - r} Q${x} ${y} ${x + r} ${y} Q${x} ${y} ${x} ${y + r} Q${x} ${y} ${x - r} ${y} Q${x} ${y} ${x} ${y - r} Z`;
   // 耳：顔の横の小さな丸。耳の下の端を軸に揺れる
-  const ear = (x, side) => {
-    const ix = side === 'l' ? -2.5 : 2.5;
-    return `
-    <g transform="translate(${x} 62)"><g class="m-ear-mood"><g class="m-ear-swing"><g class="m-ear-idle m-ear-${side}">
-      <circle cx="0" cy="-9" r="15" fill="${FUR}" ${STROKE}/>
-      <ellipse cx="${ix}" cy="-10" rx="5.6" ry="3.8" transform="rotate(${side === 'l' ? -50 : 50} ${ix} -10)" fill="${EAR_IN}"/>
+  const ear = (x, side) => `
+    <g transform="translate(${x} 79.6)"><g class="m-ear-mood"><g class="m-ear-swing"><g class="m-ear-idle m-ear-${side}">
+      <circle cx="0" cy="-12.6" r="12.6" fill="${FUR_DARK}"/>
     </g></g></g></g>`;
-  };
   // 目：ふだんは点の目。にっこり（happy）と、やさしい目（calm）は線で描く
+  const EY = 74.2;
   const eye = (x, side) => `
     <g class="m-eye m-eye-${side}">
-      <g class="m-eye-round"><ellipse cx="${x}" cy="69" rx="6" ry="6.9" fill="${INK}"/><circle cx="${x + 2}" cy="66.6" r="1.6" fill="#fff" opacity=".85"/></g>
-      <path class="m-eye-happy" d="M${x - 6.5} 72 Q${x} 63.4 ${x + 6.5} 72" fill="none" stroke="${INK}" stroke-width="4.2" stroke-linecap="round" opacity="0"/>
-      <path class="m-eye-calm" d="M${x - 6.5} 67.5 Q${x} 73.5 ${x + 6.5} 67.5" fill="none" stroke="${INK}" stroke-width="4.2" stroke-linecap="round" opacity="0"/>
+      <g class="m-eye-round"><ellipse cx="${x}" cy="${EY}" rx="5.8" ry="6.2" fill="${INK}"/></g>
+      <path class="m-eye-happy" d="M${x - 6.2} ${EY + 3} Q${x} ${EY - 5.6} ${x + 6.2} ${EY + 3}" fill="none" stroke="${INK}" stroke-width="3.8" stroke-linecap="round" opacity="0"/>
+      <path class="m-eye-calm" d="M${x - 6.2} ${EY - 1.6} Q${x} ${EY + 4.4} ${x + 6.2} ${EY - 1.6}" fill="none" stroke="${INK}" stroke-width="3.8" stroke-linecap="round" opacity="0"/>
     </g>`;
 
-  // 頭の形（横長で、上が少し平ら）。口元の白い所は頭の形で切り抜く
-  const HEAD = 'M100 18.5 C141 18.5 167 39.5 169.5 71 C172 104 141 129 100 129 C59 129 28 104 30.5 71 C33 39.5 59 18.5 100 18.5 Z';
+  // 頭の形（横長で、上が少し平ら）。白い顔は「目の下からほおへまわる」形で、頭の形で切り抜く
+  const HEAD = 'M100 25.6 C145 25.6 166.6 45.4 168.4 76 C170.2 106.6 139.6 126.4 100 126.4 C60.4 126.4 29.8 106.6 31.6 76 C33.4 45.4 55 25.6 100 25.6 Z';
+  const MASK = 'M24.4 74.2 C40.6 79.6 51.4 90.4 73 89.5 C87.4 88.6 92.8 81.4 100 81.4 C107.2 81.4 112.6 88.6 127 89.5 C148.6 90.4 159.4 79.6 175.6 74.2 L175.6 137.2 L24.4 137.2 Z';
   const SVG = `
 <svg class="mimi-svg" viewBox="0 0 200 214" aria-hidden="true" focusable="false">
   <defs><clipPath id="mimiHeadClip"><path d="${HEAD}"/></clipPath></defs>
-  <ellipse class="m-shadow" cx="100" cy="206" rx="54" ry="6.5" fill="${INK}" opacity=".16"/>
+  <ellipse class="m-shadow" cx="100" cy="207" rx="54" ry="6" fill="${INK}" opacity=".12"/>
   <g class="m-jump">
     <g class="m-squash"><g class="m-breathe">
       <g transform="translate(140 188)"><g class="m-tail-mood"><g class="m-tail-swing"><g class="m-tail">
-        <path d="M0 0 C22 4 40 -6 44 -34 C45 -42 37 -44 35 -37 C31 -18 18 -12 -2 -14 Z" fill="${FUR}" ${STROKE}/>
-        <path d="M44 -34 C45 -42 37 -44 35 -37 C34.5 -33 37.5 -30 41 -30.5 Z" fill="${FUR_DARK}"/>
+        <path d="M-7.6 -2.2 C23 -2.2 42.8 -13 55.4 -32.8" fill="none" stroke="${FUR_DARK}" stroke-width="15.3" stroke-linecap="round"/>
       </g></g></g></g>
-      <g transform="translate(55 126)"><g class="m-arm m-arm-l"><ellipse cx="0" cy="15" rx="10.5" ry="17" fill="${FUR_DARK}" ${STROKE}/></g></g>
-      <g transform="translate(145 126)"><g class="m-arm m-arm-r"><ellipse cx="0" cy="15" rx="10.5" ry="17" fill="${FUR_DARK}" ${STROKE}/></g></g>
-      <ellipse cx="79" cy="201" rx="15" ry="8.5" fill="${FUR_DARK}" ${STROKE}/>
-      <ellipse cx="121" cy="201" rx="15" ry="8.5" fill="${FUR_DARK}" ${STROKE}/>
-      <path d="M100 100 C139 100 157 136 156 166 C155 193 133 204 100 204 C67 204 45 193 44 166 C43 136 61 100 100 100 Z" fill="${FUR}" ${STROKE}/>
-      <ellipse cx="100" cy="160" rx="31" ry="38" fill="${MUZZLE}"/>
-      ${ear(38, 'l')}
-      ${ear(162, 'r')}
+      <g transform="translate(50.5 128)"><g class="m-arm m-arm-l"><rect x="-9.9" y="0" width="19.8" height="37.8" rx="9.9" fill="${FUR_DARK}"/></g></g>
+      <g transform="translate(149.5 128)"><g class="m-arm m-arm-r"><rect x="-9.9" y="0" width="19.8" height="37.8" rx="9.9" fill="${FUR_DARK}"/></g></g>
+      <rect x="64" y="191.2" width="27" height="14.4" rx="7.2" fill="${FUR_DARK}"/>
+      <rect x="109" y="191.2" width="27" height="14.4" rx="7.2" fill="${FUR_DARK}"/>
+      <rect x="47.8" y="104.8" width="104.4" height="93.6" rx="45" fill="${FUR}"/>
+      <rect x="74.8" y="130" width="50.4" height="63" rx="25.2" fill="${MUZZLE}"/>
+      ${ear(34.3, 'l')}
+      ${ear(165.7, 'r')}
       <path d="${HEAD}" fill="${FUR}"/>
-      <path clip-path="url(#mimiHeadClip)" d="M28 88 C45 74 73 75 100 78 C127 75 155 74 172 88 L172 140 L28 140 Z" fill="${MUZZLE}"/>
-      <path d="${HEAD}" fill="none" ${STROKE}/>
-      <path class="m-tie" d="M95 130 L105 130 L103.5 137 L96.5 137 Z" stroke="${INK}" stroke-width="3" stroke-linejoin="round"/>
-      <path class="m-tie" d="M96.5 137 L103.5 137 L108 156 L100 164 L92 156 Z" stroke="${INK}" stroke-width="3" stroke-linejoin="round"/>
+      <path clip-path="url(#mimiHeadClip)" d="${MASK}" fill="${MUZZLE}"/>
+      <path class="m-tie" d="M94.6 127.4 H105.4 L104 133.6 H96 Z"/>
+      <path class="m-tie" d="M96 133.6 H104 L108 153.6 L100 161 L92 153.6 Z"/>
       <g class="m-face"><g class="m-shake">
         <g class="m-brows" opacity="0">
-          <path class="m-brow-l" d="M63 58 L77 58" stroke="${INK}" stroke-width="3.4" stroke-linecap="round"/>
-          <path class="m-brow-r" d="M123 58 L137 58" stroke="${INK}" stroke-width="3.4" stroke-linecap="round"/>
+          <path class="m-brow-l" d="M70 63 L83.2 63" stroke="${INK}" stroke-width="3.2" stroke-linecap="round"/>
+          <path class="m-brow-r" d="M116.8 63 L130 63" stroke="${INK}" stroke-width="3.2" stroke-linecap="round"/>
         </g>
-        ${eye(70, 'l')}
-        ${eye(130, 'r')}
-        <ellipse class="m-cheek" cx="53" cy="88" rx="10" ry="6" fill="#efb3a6" opacity=".55"/>
-        <ellipse class="m-cheek" cx="147" cy="88" rx="10" ry="6" fill="#efb3a6" opacity=".55"/>
-        <path d="M90 79 Q100 73 110 79 Q111.5 88 100 91.5 Q88.5 88 90 79 Z" fill="${INK}"/>
-        <ellipse cx="96.5" cy="78.6" rx="2.6" ry="1.4" fill="#fff" opacity=".55"/>
-        <path d="M100 90.5 V93" stroke="${INK}" stroke-width="2.6" stroke-linecap="round"/>
-        <path class="m-mouth" d="${MOUTH.smile}" fill="#6e2f3c" stroke="${INK}" stroke-width="2" stroke-linejoin="round"/>
-        <path class="m-sweat" d="M160 34 Q167 45 160 49 Q153 45 160 34 Z" fill="#9bd8ff" stroke="${INK}" stroke-width="2.4" opacity="0"/>
+        ${eye(76.6, 'l')}
+        ${eye(123.4, 'r')}
+        <ellipse class="m-cheek" cx="60.4" cy="95.8" rx="9" ry="5.4" fill="#eeb0a3" opacity=".55"/>
+        <ellipse class="m-cheek" cx="139.6" cy="95.8" rx="9" ry="5.4" fill="#eeb0a3" opacity=".55"/>
+        <path d="M87.4 83.2 Q100 76.9 112.6 83.2 Q113.5 91.3 100 94.9 Q86.5 91.3 87.4 83.2 Z" fill="${INK}"/>
+        <path d="M100 94.2 V98.2" stroke="${INK}" stroke-width="2.6" stroke-linecap="round"/>
+        <!-- 口は MorphSVG で形を変える。形のデータは前の大きさのまま、ここで横を少しせまく・少し下へ -->
+        <g transform="translate(22 4.2) scale(.78 1)"><path class="m-mouth" d="${MOUTH.smile}" fill="${MOUTH_FILL}"/></g>
+        <path class="m-sweat" d="M156 36 Q163 47 156 51 Q149 47 156 36 Z" fill="#9bd8ff" opacity="0"/>
       </g></g>
     </g></g>
     <g class="m-fx">
       <g transform="translate(20 -18)">
         <g class="m-mark m-bang" opacity="0"><path d="M164 30 L160 52" stroke="${INK}" stroke-width="6.5" stroke-linecap="round"/><circle cx="158.6" cy="62" r="4" fill="${INK}"/></g>
         <g class="m-mark m-q" opacity="0"><path d="M150 38 Q152 28 161 29 Q170 31 168 39 Q166 45 160 47 L159 53" fill="none" stroke="${INK}" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="158.6" cy="62" r="3.6" fill="${INK}"/></g>
-        <g class="m-mark m-heart" opacity="0"><path d="M158 62 C149 55 145 49 149 43 C152 39 156 40 158 44 C160 40 164 39 167 43 C171 49 167 55 158 62 Z" fill="#ff8fa3" stroke="${INK}" stroke-width="2.6" stroke-linejoin="round"/></g>
+        <g class="m-mark m-heart" opacity="0"><path d="M158 62 C149 55 145 49 149 43 C152 39 156 40 158 44 C160 40 164 39 167 43 C171 49 167 55 158 62 Z" fill="#ef8a9b"/></g>
         <g class="m-mark m-note" opacity="0"><ellipse cx="153" cy="58" rx="6.5" ry="5" transform="rotate(-20 153 58)" fill="${INK}"/><path d="M158.5 56 L158.5 33 L168 37" fill="none" stroke="${INK}" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/></g>
       </g>
-      <path class="m-spark" d="${star(22, 92, 10)}" fill="#ffc94a" stroke="${INK}" stroke-width="2.2" stroke-linejoin="round" opacity="0"/>
-      <path class="m-spark" d="${star(180, 96, 9)}" fill="#ffc94a" stroke="${INK}" stroke-width="2.2" stroke-linejoin="round" opacity="0"/>
-      <path class="m-spark" d="${star(40, 18, 7)}" fill="#ffffff" stroke="${INK}" stroke-width="2.2" stroke-linejoin="round" opacity="0"/>
-      <path class="m-spark" d="${star(162, 14, 11)}" fill="#ffc94a" stroke="${INK}" stroke-width="2.2" stroke-linejoin="round" opacity="0"/>
-      <path class="m-spark" d="${star(100, 2, 6)}" fill="#ffffff" stroke="${INK}" stroke-width="2.2" stroke-linejoin="round" opacity="0"/>
+      <path class="m-spark" d="${star(22, 92, 10)}" fill="#f2b43c" opacity="0"/>
+      <path class="m-spark" d="${star(180, 96, 9)}" fill="#f2b43c" opacity="0"/>
+      <path class="m-spark" d="${star(40, 18, 7)}" fill="#f7d98f" opacity="0"/>
+      <path class="m-spark" d="${star(162, 14, 11)}" fill="#f2b43c" opacity="0"/>
+      <path class="m-spark" d="${star(100, 2, 6)}" fill="#f7d98f" opacity="0"/>
     </g>
   </g>
 </svg>`;
