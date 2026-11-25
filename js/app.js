@@ -8,7 +8,7 @@
   const hasDraw = Boolean(window.DrawSVGPlugin);
   const hasPhysics = Boolean(window.Physics2DPlugin);
   if (window.CustomWiggle) window.CustomWiggle.create('errShake', { wiggles: 3, type: 'easeOut' });
-  const VERSION = '1.11.0';
+  const VERSION = '1.11.1';
   const NS = 'http://www.w3.org/2000/svg';
 
   const LINES = window.MIMI_LINES;
@@ -3323,7 +3323,7 @@
   // データを節約する設定の端末では、鳴らしたものだけが保存される（sw.js）
   function saveVoices() {
     if (!window.caches || !VOICE_FILES.size || (navigator.connection && navigator.connection.saveData)) return;
-    caches.open('toeic-mimi-voice-1').then(async cache => { // sw.js の VOICE_CACHE と同じ名前
+    caches.open('toeic-mimi-voice-2').then(async cache => { // sw.js の VOICE_CACHE と同じ名前
       const have = new Set((await cache.keys()).map(r => r.url.slice(-12, -4)));
       for (const key of VOICE_FILES) {
         if (have.has(key)) continue;
