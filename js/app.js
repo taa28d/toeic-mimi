@@ -8,7 +8,7 @@
   const hasDraw = Boolean(window.DrawSVGPlugin);
   const hasPhysics = Boolean(window.Physics2DPlugin);
   if (window.CustomWiggle) window.CustomWiggle.create('errShake', { wiggles: 3, type: 'easeOut' });
-  const VERSION = '1.10.1';
+  const VERSION = '1.11.0';
   const NS = 'http://www.w3.org/2000/svg';
 
   const LINES = window.MIMI_LINES;
@@ -2156,24 +2156,25 @@
       const full = make('div', 'full');
       const p = filledSentence(g.q, rightText, g.notes[0] || null);
       full.append(p, sayButton(g.q.replace('-------', rightText), .9));
-      const notes = make('dl', 'notes');
+      // 訳は英文のすぐ下。その下に選択肢ごとの理由を、ボタンと同じ A〜D の順・同じ色で並べる
       const mine = !ok && chosen && !chosen.right ? chosen.oi : null;
-      const mineRow = mine != null ? optWhy(g, mine) : null;
-      if (mineRow) {
-        const dd = make('dd', 'mine');
-        dd.append(mineRow);
-        notes.append(make('dt', 'mine', 'あなたの答え'), dd);
-      }
-      notes.append(make('dt', null, ok ? 'ポイント' : '正解の理由'), make('dd', null, g.why));
-      // ほかの選択肢は、画面の並び順で（選んだものは上に出したので除く）
-      const others = q.choices.filter(c => !c.right && c.oi !== mine).map(c => optWhy(g, c.oi)).filter(Boolean);
-      if (others.length) {
-        const dd = make('dd', 'others');
-        dd.append(...others);
-        notes.append(make('dt', null, 'ほかの選択肢'), dd);
-      }
-      notes.append(make('dt', null, '訳'), make('dd', null, g.ja));
-      box.append(full, notes);
+      const whys = make('ul', 'whys');
+      q.choices.forEach((c, i) => {
+        const tone = c.right ? 'good' : c.oi === mine ? 'bad' : '';
+        const row = make('li', tone ? `why-row ${tone}` : 'why-row');
+        const head = make('div', 'why-head');
+        const word = make('b', 'why-word', c.text);
+        word.lang = 'en';
+        head.append(word);
+        if (tone) head.append(make('span', 'why-tag', c.right ? '正解' : 'あなたの答え'));
+        const body = make('div');
+        body.append(head);
+        const why = c.right ? g.why : g.whyNot[c.oi - 1];
+        if (why) body.append(make('p', 'why-text', why));
+        row.append(make('span', 'why-key', 'ABCD'[i]), body);
+        whys.append(row);
+      });
+      box.append(full, make('p', 'full-ja', g.ja), whys);
     } else {
       const w = q.word;
       const full = make('div', 'full');

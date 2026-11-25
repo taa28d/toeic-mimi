@@ -491,13 +491,30 @@ body[data-screen="quiz"] .app, body[data-screen="lesson"] .app { padding-bottom:
 .notes { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 10px; font-size: .94rem; }
 .notes dt { font-size: .74rem; font-weight: 700; color: var(--accent-text); background: var(--accent-soft); border-radius: 7px; padding: 2px 7px; height: fit-content; margin-top: 2px; white-space: nowrap; }
 .notes dd { line-height: 1.65; }
-/* まちがえたとき：選んだ答えがなぜダメか（赤）と、ほかの選択肢の理由（1つずつ1行） */
+/* 単語でまちがえたとき：選んだ答えが本当はどの語か（赤） */
 .notes dt { justify-self: start; }
 .notes dt.mine { color: var(--bad-text); background: var(--bad-soft); }
-.notes dd.others { display: grid; gap: 5px; }
 .opt-why b, .notes dd.mine b { font-family: var(--en); font-weight: 700; }
 .opt-why b { margin-right: .45em; }
 .notes dd.mine b { color: var(--bad-text); }
+/* 文法の解説：英文の訳と、選択肢ごとの理由。理由はボタンと同じ A〜D の順で、正解と自分の答えはボタンと同じ色の帯。
+   帯は左右に少しはみ出させ、記号と文の左端は英文・訳とそろえる */
+.explain > .full-ja { margin-top: 2px; color: var(--muted); font-size: .9rem; line-height: 1.6; }
+.whys { display: grid; gap: 2px; margin: 0 -10px; padding: 0; list-style: none; font-size: .94rem; }
+.explain > .whys { margin-top: 8px; }
+.why-row { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 10px; padding: 9px 10px; border-radius: 12px; }
+.why-row.good { background: var(--good-soft); }
+.why-row.bad { background: var(--bad-soft); }
+.why-key { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--sunken); color: var(--muted); font: 700 .72rem/1 var(--en); }
+.why-row.good .why-key { background: var(--good); color: var(--on-good); }
+.why-row.bad .why-key { background: var(--bad); color: var(--on-bad); }
+.why-head { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; min-height: 22px; }
+.why-word { font-family: var(--en); font-weight: 700; }
+.why-tag { font-size: .72rem; font-weight: 700; }
+.why-row.good .why-word, .why-row.good .why-tag { color: var(--good-text); }
+.why-row.bad .why-word, .why-row.bad .why-tag { color: var(--bad-text); }
+.why-text { margin: 1px 0 0; color: var(--muted); font-size: .9rem; line-height: 1.6; }
+.why-row.good .why-text, .why-row.bad .why-text { color: var(--text); }
 
 /* 答えたあと、選択肢の下に出す段（ch-）：文法は品詞の札と意味、単語はその選択肢の意味 */
 .choice .txt { min-width: 0; }
