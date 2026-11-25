@@ -8,7 +8,7 @@
   const hasDraw = Boolean(window.DrawSVGPlugin);
   const hasPhysics = Boolean(window.Physics2DPlugin);
   if (window.CustomWiggle) window.CustomWiggle.create('errShake', { wiggles: 3, type: 'easeOut' });
-  const VERSION = '1.10.0';
+  const VERSION = '1.10.1';
   const NS = 'http://www.w3.org/2000/svg';
 
   const LINES = window.MIMI_LINES;
@@ -220,7 +220,7 @@
     }
     window.addEventListener('online', choose);
     window.addEventListener('offline', choose);
-    // iPhone は押した瞬間に一度使っておくと、あとからの読み上げも許される
+    // iPhone は、押したとき（指を離したとき）に一度使っておくと、あとからの読み上げも許される
     function prime() {
       if (!synth || primed) return;
       primed = true;
@@ -248,8 +248,14 @@
       const mine = token;
       const a = sound.ready();
       if (!a) return speakDevice(text, rate, onEnd);
-      clips.load(a, text).then(buf => {
+      clips.load(a, text).then(buf => sound.whenRunning(a).then(ok => ({ buf, ok }))).then(({ buf, ok }) => {
         if (mine !== token) { if (onEnd) onEnd({ error: 'canceled' }); return; }
+        if (!ok) {
+          // ブラウザがまだ音を止めている（起動してから一度も押していない・別のアプリから戻った直後など）。
+          // 止まったまま始めると、次に押したときに急に鳴りだすので鳴らさない。ストア版は端末の読み上げ機能なら鳴る
+          if (nativeTTS) { if (!speakDevice(text, rate, onEnd) && onEnd) onEnd({ error: 'failed' }); } else if (onEnd) onEnd({ error: 'blocked' });
+          return;
+        }
         const src = a.createBufferSource();
         src.buffer = buf;
         src.connect(a.destination);
@@ -372,6 +378,21 @@
         if (ctx.state !== 'running') Promise.resolve(ctx.resume()).catch(() => {});
         return ctx;
       } catch { return null; }
+    }
+    // 音が鳴らせる状態になるのを少し待つ。ブラウザが音を止めたまま（まだ押していない）なら false
+    function whenRunning(a, ms = 800) {
+      if (!('state' in a) || a.state === 'running') return Promise.resolve(true);
+      return new Promise(done => {
+        const check = () => {
+          if (a.state !== 'running') return;
+          clearTimeout(timer);
+          a.removeEventListener('statechange', check);
+          done(true);
+        };
+        const timer = setTimeout(() => { a.removeEventListener('statechange', check); done(a.state === 'running'); }, ms);
+        a.addEventListener('statechange', check);
+        Promise.resolve(a.resume()).then(check, () => {});
+      });
     }
     function tone(a, { type = 'sine', from, to = from, at = 0, len, vol, attack = .006, out = a.destination }) {
       const t = a.currentTime + at;
@@ -516,7 +537,7 @@
       if (!a) return;
       try { draw[name](a, arg); } catch { /* 音が出せなくても続ける */ }
     }
-    return { play, ready, draw };
+    return { play, ready, whenRunning, draw, state: () => (ctx ? ctx.state : 'none') };
   })();
 
   /* ━━ 5b. BGM：OpenTracks の「高架下と赤提灯」（作曲 H★） ━━
@@ -1277,8 +1298,14 @@
   });
   document.addEventListener('touchstart', () => {}, { passive: true }); // iPhone で :active を効かせる
 
-  // 最初に触れたときに、音と読み上げを使える状態にする（iPhone の決まり）
-  document.addEventListener('pointerdown', () => { sound.ready(); speech.prime(); }, { once: true, capture: true });
+  // 音と読み上げを使える状態にする。ブラウザは、画面を押すまで音を出させない。
+  // iPhone の Safari や Android は、指が触れた瞬間（pointerdown）ではなく、離したとき（touchend・click）を「押した」と数える。
+  // 別のアプリから戻った直後なども音が止められていることがあるので、止まっていれば押すたびに戻す（効果音を切っていても）
+  const wakeAudio = e => {
+    sound.ready();
+    if (e.type !== 'pointerdown') speech.prime();
+  };
+  ['pointerdown', 'touchend', 'click', 'keydown'].forEach(type => document.addEventListener(type, wakeAudio, { capture: true, passive: true }));
   // BGM も画面を押してから鳴らす（ブラウザは押す前に音を出させない）。止まっていたら、押すたびにまた試す
   document.addEventListener('pointerdown', () => bgm.start(), { capture: true });
 
@@ -3329,7 +3356,7 @@
   // 自動テスト用の入口。テストのときだけ外から渡される
   if (window.__TOEIC_HOOK__) {
     window.__TOEIC_HOOK__({
-      store, mimi, sound, WORDS, GRAMMAR, SETS, CATS, composeDaily, levelInfo, wordChoices, overlaps, senses,
+      store, mimi, sound, speech, WORDS, GRAMMAR, SETS, CATS, composeDaily, levelInfo, wordChoices, overlaps, senses,
       startDaily, startDrill, startCatQuiz, startCards, openLesson, goHome, openWords, openGrammar, openProfile, openSettings, openCloset, syncCloset, outfit, applyAccent,
       answer: (i, timedOut) => answer(i, timedOut), rightIndex: () => round?.q?.choices?.findIndex(c => c.right) ?? -1,
       next: () => quizEls.next.click(), currentRound: () => round, currentScreen: () => current, deck: () => deck,
