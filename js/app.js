@@ -8,7 +8,7 @@
   const hasDraw = Boolean(window.DrawSVGPlugin);
   const hasPhysics = Boolean(window.Physics2DPlugin);
   if (window.CustomWiggle) window.CustomWiggle.create('errShake', { wiggles: 3, type: 'easeOut' });
-  const VERSION = '1.11.1';
+  const VERSION = '1.12.0';
   const NS = 'http://www.w3.org/2000/svg';
 
   const LINES = window.MIMI_LINES;
@@ -164,7 +164,7 @@
   matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', syncThemeColor);
 
   /* ━━ 4. 英語の読み上げ ━━
-     単語・例文・文法の文は、前もって自然な声で作った音声（voice/ の MP3。Kokoro の af_heart）を鳴らす。
+     単語・例文・文法の文は、前もって自然な声で作った音声（voice/ の MP3。Microsoft Azure AI Speech の Jenny・Andrew の声）を鳴らす。
      どの端末でも同じ声で、通信がなくても鳴る。音声がない文や、読めなかったときだけ端末の読み上げ機能を使う：
      ブラウザでは Web Speech API、ストア版（Capacitor）では Android の WebView にそれがないので
      @capacitor-community/text-to-speech。どれも同じ呼び方で使える */
@@ -3323,7 +3323,7 @@
   // データを節約する設定の端末では、鳴らしたものだけが保存される（sw.js）
   function saveVoices() {
     if (!window.caches || !VOICE_FILES.size || (navigator.connection && navigator.connection.saveData)) return;
-    caches.open('toeic-mimi-voice-2').then(async cache => { // sw.js の VOICE_CACHE と同じ名前
+    caches.open('toeic-mimi-voice-3').then(async cache => { // sw.js の VOICE_CACHE と同じ名前
       const have = new Set((await cache.keys()).map(r => r.url.slice(-12, -4)));
       for (const key of VOICE_FILES) {
         if (have.has(key)) continue;
